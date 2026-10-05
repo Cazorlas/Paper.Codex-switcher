@@ -157,7 +157,7 @@ pub enum Commands {
         after_help = "`use` switches ChatGPT profiles only. Start a custom API provider with `paper-codex-switch launch <alias>`.\n\nWhen the live auth.json actually changes and a Codex app-server daemon (Codex 0.157+) is running, `codex app-server daemon restart` is run (bounded to 15 seconds) so new sessions use the selected account; a failed restart is a warning, not a failed switch. `login` (when it activates credentials) and the TUI `u` switch do the same.\nSet `[use] restart_app_server = false` in config.toml (or in TUI Settings) to leave the daemon alone; the note then shows the manual command."
     )]
     Use {
-        /// Profile alias (omit to auto-select)
+        /// Profile alias or its number in `list` (omit to auto-select the best)
         alias: Option<String>,
         /// When the pool is exhausted, automatically consume the earliest-expiring
         /// reset card to revive an account (only applies when alias is omitted;

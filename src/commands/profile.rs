@@ -38,6 +38,10 @@ pub(crate) async fn use_cmd(alias: Option<&str>, json: bool, consume_card: bool)
 
     auth::ensure_file_credentials_store()?;
 
+    // `use 2` picks the 2nd profile in `list` order (1-based), unless a profile is
+    // literally named "2".
+    let by_index = alias.and_then(resolve_profile_index);
+    let alias = by_index.as_deref().or(alias);
     match alias {
         Some(a) => {
             if crate::provider::exists(a) {
@@ -66,6 +70,17 @@ pub(crate) async fn use_cmd(alias: Option<&str>, json: bool, consume_card: bool)
         None => best_cmd(json, consume_card).await?,
     }
     Ok(())
+}
+
+/// Map a 1-based position in `list` order to a profile alias. `None` when the
+/// text is not a number, is out of range, or names an existing profile.
+fn resolve_profile_index(text: &str) -> Option<String> {
+    let n: usize = text.parse().ok()?;
+    let profiles = profile::list_profiles().ok()?;
+    if profiles.iter().any(|p| p == text) {
+        return None;
+    }
+    profiles.get(n.checked_sub(1)?).cloned()
 }
 
 // ── list (all profiles + usage, concurrent) ──────────────
@@ -215,7 +230,7 @@ pub(crate) async fn list_cmd(force: bool, json: bool, auth_already_handled: bool
 
     let mut json_items = vec![];
 
-    for row in rows {
+    for (position, row) in rows.into_iter().enumerate() {
         let usage_result = row.usage_result.unwrap_or_else(|| {
             Err(usage::UsageError {
                 summary: "unknown".into(),
@@ -250,7 +265,7 @@ pub(crate) async fn list_cmd(force: bool, json: bool, auth_already_handled: bool
             } else {
                 row.name.clone()
             };
-            print!("{mark} {alias_str}");
+            print!("{mark} {} {alias_str}", color::dim(&format!("{}.", position + 1)));
             if let Some(email) = &row.info.email {
                 print!("  {}", color::dim(email));
             }
