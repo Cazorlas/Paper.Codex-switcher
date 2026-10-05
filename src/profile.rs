@@ -1313,6 +1313,47 @@ pub fn cmd_delete(alias: &str) -> Result<()> {
     Ok(())
 }
 
+/// Archived profiles as `(alias, archive dir name)`, newest first per alias.
+pub fn list_deleted() -> Result<Vec<(String, String)>> {
+    let dir = deleted_profiles_dir()?;
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut out: Vec<(String, String)> = std::fs::read_dir(&dir)
+        .with_context(|| format!("reading {}", dir.display()))?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter_map(|name| {
+            let (alias, _) = name.rsplit_once(".backup-")?;
+            Some((alias.to_string(), name))
+        })
+        .collect();
+    // The suffix is a nanosecond timestamp, so reverse-name order is newest first.
+    out.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+    Ok(out)
+}
+
+/// Bring the newest archive of `alias` back as `new_alias` (default: `alias`).
+pub fn cmd_restore(alias: &str, new_alias: Option<&str>) -> Result<String> {
+    validate_alias(alias)?;
+    let target = new_alias.unwrap_or(alias);
+    validate_alias(target)?;
+    let _transaction = lock_auth_transaction()?;
+    let archive = list_deleted()?
+        .into_iter()
+        .find(|(a, _)| a == alias)
+        .map(|(_, name)| deleted_profiles_dir().map(|d| d.join(name)))
+        .transpose()?
+        .ok_or_else(|| anyhow::anyhow!("no deleted profile named '{alias}'"))?;
+    let dest = profiles_dir()?.join(target);
+    if dest.exists() {
+        anyhow::bail!("profile '{target}' already exists; use --as <new-alias>");
+    }
+    std::fs::rename(&archive, &dest)
+        .with_context(|| format!("restoring {} to {}", archive.display(), dest.display()))?;
+    Ok(target.to_string())
+}
+
 pub fn collect_import_files(path: &Path) -> Result<Vec<PathBuf>> {
     if !path.exists() {
         return Err(CsError::NoAuthFile(path.display().to_string()).into());

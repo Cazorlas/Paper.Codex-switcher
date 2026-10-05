@@ -162,6 +162,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::ResetCard { .. } => "reset-card",
         Commands::Rename { .. } => "rename",
         Commands::Delete { .. } => "delete",
+        Commands::Restore { .. } => "restore",
         Commands::Login { .. } => "login",
         Commands::Import { .. } => "import",
         Commands::SelfUpdate { .. } => "self-update",
@@ -231,6 +232,9 @@ async fn dispatch(
         Commands::List { force } => commands::list_cmd(force, json, auth_handled).await?,
         Commands::ResetCard { alias, yes } => commands::reset_card_cmd(&alias, yes, json).await?,
         Commands::Rename { old, new } => commands::rename_cmd(&old, &new, json)?,
+        Commands::Restore { alias, as_alias } => {
+            commands::restore_cmd(alias.as_deref(), as_alias.as_deref(), json)?
+        }
         Commands::Delete { alias, yes } => commands::delete_cmd(&alias, yes, json)?,
         Commands::Login { alias, device } => {
             commands::login_cmd(alias.as_deref(), device, json).await?

@@ -1726,3 +1726,34 @@ fn json_directory_import_surfaces_lost_credentials_at_top_level() {
 
     let _ = fs::remove_dir_all(home);
 }
+
+#[test]
+fn deleted_profile_can_be_listed_and_restored() {
+    let home = temp_home("restore");
+    for (alias, id) in [("alice", "acct_a"), ("bob", "acct_b")] {
+        write_json(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json")),
+            &auth_json(&format!("{alias}@example.com"), id),
+        );
+    }
+    fs::write(home.join(".paper-codex-switch/current"), "alice").unwrap();
+
+    let output = run(&home, &["delete", "bob", "--yes"]);
+    assert!(output.status.success(), "{output:?}");
+    assert!(!home.join(".paper-codex-switch/profiles/bob").exists());
+
+    let output = run(&home, &["--json", "restore"]);
+    assert_eq!(
+        parse_stdout_json(&output),
+        serde_json::json!({"deleted": ["bob"]})
+    );
+
+    let output = run(&home, &["--json", "restore", "bob"]);
+    assert!(output.status.success(), "{output:?}");
+    assert!(home.join(".paper-codex-switch/profiles/bob/auth.json").exists());
+
+    let output = run(&home, &["--json", "restore", "bob"]);
+    assert!(!output.status.success(), "no archive is left to restore");
+
+    let _ = fs::remove_dir_all(home);
+}

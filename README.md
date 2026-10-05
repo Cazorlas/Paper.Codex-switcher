@@ -81,7 +81,8 @@ paper-codex-switch auto           # switch automatically near the limit (see bel
 | Re-authorize an expired account | `paper-codex-switch login <existing alias>` |
 | Import an `auth.json` file or a folder of them | `paper-codex-switch import <path> [alias]` |
 | Rename | `paper-codex-switch rename <old> <new>` |
-| Delete (kept in an archive, recoverable; the active account can't be deleted) | `paper-codex-switch delete <alias> [--yes]` |
+| Delete (archived, recoverable; the active account can't be deleted) | `paper-codex-switch delete <alias> [--yes]` |
+| List deleted accounts / bring one back | `paper-codex-switch restore` / `paper-codex-switch restore <alias> [--as <new>]` |
 | Refresh usage now, ignoring the cache | `paper-codex-switch list --force` |
 | Start the 5h timer of a fresh account | `paper-codex-switch warmup [alias]` |
 | Use a reset card on an account | `paper-codex-switch reset-card <alias>` |
@@ -89,6 +90,8 @@ paper-codex-switch auto           # switch automatically near the limit (see bel
 | Check Codex version and setup | `paper-codex-switch doctor` |
 
 Global flags: `--json` / `--json-pretty` (machine-readable output), `--proxy <url>`, `--color always|never`, `--debug`. Settings live in `~/.paper-codex-switch/config.toml` (also editable in the `tui` Settings tab).
+
+To remove accounts you no longer use: `list`, then `delete <alias>`. Deleting is not final: `restore` lists what was deleted and `restore <alias>` brings the newest archive back (use `--as` if the name is taken). Archives live in `~/.paper-codex-switch/deleted-profiles`. `auto` only ever switches between accounts that are saved, so deleting an account also takes it out of rotation.
 
 ### Update / uninstall
 

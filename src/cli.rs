@@ -225,6 +225,14 @@ Examples:
         #[arg(long, short)]
         yes: bool,
     },
+    /// List deleted profiles, or restore one (newest archive) by alias
+    Restore {
+        /// Deleted profile alias (omit to list what can be restored)
+        alias: Option<String>,
+        /// Restore under a different alias
+        #[arg(long = "as", value_name = "NEW_ALIAS")]
+        as_alias: Option<String>,
+    },
     /// Log in via browser or --device code flow; re-authorizes if alias already exists
     #[command(
         after_help = "Creating a profile or re-authorizing the active one makes those credentials live in auth.json; a running Codex app-server daemon is then restarted like after `use` (see `use --help`)."

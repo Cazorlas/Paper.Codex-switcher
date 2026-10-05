@@ -320,6 +320,38 @@ pub(crate) fn rename_cmd(old: &str, new: &str, json: bool) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn restore_cmd(alias: Option<&str>, as_alias: Option<&str>, json: bool) -> Result<()> {
+    let Some(alias) = alias else {
+        let deleted = profile::list_deleted()?;
+        if json {
+            let names: Vec<_> = deleted.iter().map(|(a, _)| a.as_str()).collect();
+            print_json(&serde_json::json!({ "deleted": names }));
+        } else if deleted.is_empty() {
+            println!("{}", color::dim("(no deleted profiles)"));
+        } else {
+            for (alias, archive) in deleted {
+                println!("{alias}  {}", color::dim(&archive));
+            }
+            println!(
+                "{}",
+                color::dim("restore one with `paper-codex-switch restore <alias>`")
+            );
+        }
+        return Ok(());
+    };
+    let restored = profile::cmd_restore(alias, as_alias)?;
+    if json {
+        print_json(&output::JsonOk {
+            ok: true,
+            alias: restored,
+            action: "restored".into(),
+        });
+    } else {
+        println!("{}", color::success(&format!("Restored profile: {restored}")));
+    }
+    Ok(())
+}
+
 pub(crate) fn delete_cmd(alias: &str, yes: bool, json: bool) -> Result<()> {
     use std::io::IsTerminal;
 
