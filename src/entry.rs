@@ -217,7 +217,11 @@ async fn dispatch(
             cooldown,
             once,
             dry_run,
+            status,
         } => {
+            if status {
+                return commands::auto_status_cmd(json);
+            }
             commands::auto_cmd(commands::AutoOptions {
                 threshold,
                 margin,

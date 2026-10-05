@@ -2,7 +2,7 @@
 //! Codex hits its usage limit (the claude-swap `cswap auto` model).
 
 use super::profile::{report_daemon_restart, score_profile_candidates};
-use crate::{app_server, auth, cache, color, config, profile, usage};
+use crate::{app_server, auth, cache, color, config, output, profile, usage};
 use anyhow::{Context, Result};
 use std::time::{Duration, Instant};
 
@@ -87,7 +87,95 @@ pub(crate) fn decide(
     }
 }
 
+static LAST_EVENT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+fn log_path() -> Result<std::path::PathBuf> {
+    Ok(auth::app_home()?.join("auto.log"))
+}
+
+fn status_path() -> Result<std::path::PathBuf> {
+    Ok(auth::app_home()?.join("auto-status.json"))
+}
+
+/// Append one line to `auto.log` (rotated to `auto.log.1` past 256 KiB) so a
+/// hidden background `auto` leaves a trail.
+fn append_log(line: &str) {
+    use std::io::Write;
+    let Ok(path) = log_path() else { return };
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 256 * 1024) {
+        let _ = std::fs::rename(&path, path.with_extension("log.1"));
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(f, "{} {line}", auth::now_unix_secs());
+    }
+}
+
+/// Heartbeat read by `auto --status`.
+fn write_status(wait: Duration) {
+    let last = LAST_EVENT.lock().map(|g| g.clone()).unwrap_or_default();
+    let body = serde_json::json!({
+        "pid": std::process::id(),
+        "at": auth::now_unix_secs(),
+        "next_check_in_secs": wait.as_secs(),
+        "last": last,
+    });
+    if let Ok(path) = status_path() {
+        let _ = std::fs::write(path, body.to_string());
+    }
+}
+
+/// `auto --status`: is a background `auto` alive, and what did it do last?
+pub(crate) fn status_cmd(json: bool) -> Result<()> {
+    let now = auth::now_unix_secs();
+    let status: Option<serde_json::Value> = status_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| serde_json::from_str(&t).ok());
+    let (running, age, last, pid) = match &status {
+        Some(v) => {
+            let at = v["at"].as_i64().unwrap_or(0);
+            let next = v["next_check_in_secs"].as_i64().unwrap_or(60);
+            let age = now - at;
+            (
+                age <= next * 2 + 120,
+                Some(age),
+                v["last"].as_str().unwrap_or("").to_string(),
+                v["pid"].as_u64(),
+            )
+        }
+        None => (false, None, String::new(), None),
+    };
+    if json {
+        output::print_json(&serde_json::json!({
+            "running": running, "pid": pid, "last_heartbeat_secs_ago": age, "last": last,
+        }));
+    } else if running {
+        println!(
+            "{}",
+            color::success(&format!(
+                "auto is running (pid {}, last check {}s ago)",
+                pid.unwrap_or(0),
+                age.unwrap_or(0)
+            ))
+        );
+        println!("  last: {last}");
+    } else {
+        println!("{}", color::warn("auto is not running"));
+        if age.is_some() {
+            println!("  last: {last}");
+        }
+    }
+    if let Ok(p) = log_path() {
+        println!("  log: {}", p.display());
+    }
+    Ok(())
+}
+
 fn emit(opts: &AutoOptions, event: &str, detail: serde_json::Value, text: String) {
+    if let Ok(mut last) = LAST_EVENT.lock() {
+        *last = format!("{event}: {}", strip_ansi(&text));
+    }
+    append_log(&format!("{event} {}", strip_ansi(&text)));
     if opts.json {
         let mut obj = serde_json::json!({ "event": event, "at": auth::now_unix_secs() });
         if let (Some(o), Some(d)) = (obj.as_object_mut(), detail.as_object()) {
@@ -296,11 +384,29 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
         } else {
             opts.interval
         };
+        write_status(wait);
         tokio::select! {
             _ = tokio::time::sleep(wait) => {}
             _ = tokio::signal::ctrl_c() => return Ok(()),
         }
     }
+}
+
+fn strip_ansi(text: &str) -> String {
+    let mut out = String::new();
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '' && chars.peek() == Some(&'[') {
+            for n in chars.by_ref() {
+                if n.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 #[cfg(test)]

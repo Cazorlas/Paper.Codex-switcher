@@ -11,7 +11,7 @@ mod render;
 mod update;
 
 pub(crate) use crate::launch::{launch_cmd, launch_for_tui};
-pub(crate) use auto::{AutoOptions, Decision as AutoDecision, auto_cmd, tick as auto_tick};
+pub(crate) use auto::{AutoOptions, Decision as AutoDecision, auto_cmd, status_cmd as auto_status_cmd, tick as auto_tick};
 pub(crate) use doctor::doctor_cmd;
 pub(crate) use import::import_cmd;
 pub(crate) use login::login_cmd;

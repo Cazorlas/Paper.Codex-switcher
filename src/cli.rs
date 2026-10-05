@@ -195,6 +195,9 @@ Examples:
         /// Report what would happen without switching
         #[arg(long)]
         dry_run: bool,
+        /// Show whether a background `auto` is running and what it did last
+        #[arg(long)]
+        status: bool,
     },
     /// List all profiles with account info, usage, and availability
     List {
