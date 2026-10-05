@@ -42,19 +42,62 @@ cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher
 
 Data lives in `~/.paper-codex-switch` (override with `PAPER_CODEX_SWITCH_HOME`). `self-update` is disabled; update with npm or cargo.
 
-## Quick start
+## Setup (first time)
+
+1. Install Codex CLI (0.159.2+) and make sure it uses the file credential store (see Requirements).
+2. Install paper-codex-switch (see Install) and check everything with:
+   ```bash
+   paper-codex-switch doctor
+   ```
+3. Add your accounts, one `login` per account (a browser opens; use `--device` on a headless machine):
+   ```bash
+   paper-codex-switch login personal
+   paper-codex-switch login work
+   ```
+   Already signed in to Codex with another account? Just run `paper-codex-switch list`: it detects the account in `~/.codex/auth.json` and offers to save it.
+4. Check them: `paper-codex-switch list`.
+
+## Everyday use
 
 ```bash
-paper-codex-switch login          # add an account (--device on headless machines); repeat per account
-paper-codex-switch list           # numbered usage dashboard
+paper-codex-switch list           # numbered usage dashboard (5h and 7d windows)
 paper-codex-switch use            # switch to the best account
 paper-codex-switch use 2          # switch to account number 2 in `list`
 paper-codex-switch use work       # ...or by alias
-paper-codex-switch tui            # interactive dashboard
 paper-codex-switch launch         # start Codex on the best account
+paper-codex-switch tui            # interactive dashboard
+paper-codex-switch auto           # switch automatically near the limit (see below)
 ```
 
+![paper-codex-switch list](docs/list.png)
+
 `use <n>` uses the numbers shown by `list` (alphabetical by alias); a profile literally named `2` wins over position 2.
+
+## Manage accounts
+
+| Task | Command |
+|---|---|
+| Add an account | `paper-codex-switch login [alias]` |
+| Re-authorize an expired account | `paper-codex-switch login <existing alias>` |
+| Import an `auth.json` file or a folder of them | `paper-codex-switch import <path> [alias]` |
+| Rename | `paper-codex-switch rename <old> <new>` |
+| Delete (kept in an archive, recoverable; the active account can't be deleted) | `paper-codex-switch delete <alias> [--yes]` |
+| Refresh usage now, ignoring the cache | `paper-codex-switch list --force` |
+| Start the 5h timer of a fresh account | `paper-codex-switch warmup [alias]` |
+| Use a reset card on an account | `paper-codex-switch reset-card <alias>` |
+| Open the data folder | `paper-codex-switch open` |
+| Check Codex version and setup | `paper-codex-switch doctor` |
+
+Global flags: `--json` / `--json-pretty` (machine-readable output), `--proxy <url>`, `--color always|never`, `--debug`. Settings live in `~/.paper-codex-switch/config.toml` (also editable in the `tui` Settings tab).
+
+### Update / uninstall
+
+```bash
+npm i -g paper-codex-switch@latest    # update
+npm rm -g paper-codex-switch          # uninstall
+```
+
+Your accounts stay in `~/.paper-codex-switch`; delete that folder to remove them too.
 
 ## Automatic switching
 
