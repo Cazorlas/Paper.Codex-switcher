@@ -8,8 +8,10 @@ Forked from [xjoker/codex-switch](https://github.com/xjoker/codex-switch) (MIT, 
 
 ## Install
 
-```powershell
-cargo install --path .        # installs paper-codex-switch
+```bash
+npm i -g paper-codex-switch                 # prebuilt binary (Windows / macOS / Linux x64, macOS arm64)
+# or build from source (Rust 1.88+):
+cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher
 ```
 
 Data lives in `~/.paper-codex-switch` (override with `PAPER_CODEX_SWITCH_HOME`). `self-update` is disabled in this fork.
@@ -22,6 +24,8 @@ paper-codex-switch list         # usage dashboard
 paper-codex-switch use          # switch to the best account (or `use <alias>`)
 paper-codex-switch tui          # interactive dashboard
 paper-codex-switch launch       # start Codex with the best account
+paper-codex-switch launch --auto-swap   # ...and, at the usage threshold, restart the session
+                                        # on a better account with `codex resume --last`
 ```
 
 ## Automatic switching

@@ -1651,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "paper-codex-switch"
-version = "20261001.5.0"
+version = "20261005.1.0"
 dependencies = [
  "anyhow",
  "axum",

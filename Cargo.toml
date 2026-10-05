@@ -1,11 +1,11 @@
 [package]
 name = "paper-codex-switch"
-version = "20261001.5.0"
+version = "20261005.1.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Codex account switcher — multi-profile manager with usage dashboard"
 license = "MIT"
-repository = "https://github.com/xjoker/codex-switch"
+repository = "https://github.com/Cazorlas/Paper.Codex-switcher"
 keywords = ["codex", "openai", "account", "switcher", "cli"]
 categories = ["command-line-utilities"]
 

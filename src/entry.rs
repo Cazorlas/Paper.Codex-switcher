@@ -250,11 +250,29 @@ async fn dispatch(
             alias,
             consume_card,
             model,
+            auto_swap,
+            swap_threshold,
             args,
         } => {
             let args = merge_launch_args(args, launch_passthrough);
-            commands::launch_cmd(alias.as_deref(), args, json, consume_card, model.as_deref())
-                .await?
+            let auto_swap = auto_swap.then(|| commands::AutoOptions {
+                threshold: swap_threshold,
+                margin: 10.0,
+                interval: std::time::Duration::from_secs(60),
+                cooldown: std::time::Duration::from_secs(300),
+                once: false,
+                dry_run: false,
+                json: false,
+            });
+            commands::launch_cmd(
+                alias.as_deref(),
+                args,
+                json,
+                consume_card,
+                model.as_deref(),
+                auto_swap,
+            )
+            .await?
         }
         Commands::Tui => tui::run_tui().await?,
         Commands::Open => commands::open_cmd()?,

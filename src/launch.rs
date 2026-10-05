@@ -63,6 +63,52 @@ async fn wait_for_child_or_shutdown(
     }
 }
 
+enum SessionEnd {
+    Exited(std::process::ExitStatus),
+    Signal(ShutdownSignal),
+    Swap(String),
+}
+
+/// Like `wait_for_child_or_shutdown`, but when `watch` is set also checks the
+/// session account's quota every `interval` and reports a better account once
+/// the threshold is reached. Codex reads auth only at startup, so the running
+/// session cannot change account; the caller restarts it on the new one.
+async fn wait_for_child_or_swap(
+    child: &mut std::process::Child,
+    shutdown: &mut ShutdownListener,
+    watch: Option<&crate::commands::AutoOptions>,
+    session_alias: &str,
+) -> std::io::Result<SessionEnd> {
+    let mut next_check = std::time::Instant::now() + watch.map_or_else(Default::default, |w| w.interval);
+    loop {
+        tokio::select! {
+            signal = shutdown.recv_signal() => return Ok(SessionEnd::Signal(signal)),
+            _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                if let Some(status) = child.try_wait()? {
+                    return Ok(SessionEnd::Exited(status));
+                }
+            }
+        }
+        let Some(opts) = watch else { continue };
+        if std::time::Instant::now() < next_check {
+            continue;
+        }
+        let marker = profile::read_current();
+        let decision = tokio::select! {
+            signal = shutdown.recv_signal() => return Ok(SessionEnd::Signal(signal)),
+            d = crate::commands::auto_tick(opts, session_alias, &marker) => d,
+        };
+        match decision {
+            Ok(crate::commands::AutoDecision::Switch { alias, .. }) => {
+                return Ok(SessionEnd::Swap(alias));
+            }
+            Ok(_) => {}
+            Err(e) => tracing::warn!("auto-swap check failed: {e:#}"),
+        }
+        next_check = std::time::Instant::now() + opts.interval;
+    }
+}
+
 /// Launch Codex for one alias from the TUI. Returns Codex's exit code instead of
 /// terminating the paper-codex-switch process on failure.
 pub(crate) async fn launch_for_tui(
@@ -80,6 +126,7 @@ pub(crate) async fn launch_for_tui(
         model,
         reasoning,
         Some(shutdown),
+        None,
     )
     .await
 }
@@ -90,6 +137,7 @@ pub(crate) async fn launch_cmd(
     json: bool,
     consume_card: bool,
     model: Option<&str>,
+    auto_swap: Option<crate::commands::AutoOptions>,
 ) -> Result<()> {
     finish_launch_cli(
         launch_interactive(
@@ -100,6 +148,7 @@ pub(crate) async fn launch_cmd(
             model,
             ReasoningLaunch::Saved,
             None,
+            auto_swap,
         )
         .await?,
     )
@@ -132,6 +181,7 @@ async fn launch_interactive(
     model: Option<&str>,
     reasoning: ReasoningLaunch,
     tui_shutdown: Option<&mut ShutdownListener>,
+    auto_swap: Option<crate::commands::AutoOptions>,
 ) -> Result<TuiLaunchOutcome> {
     // Resolve and validate the exact executable once, before profile selection
     // can consume a reset card or provider launch can create a native run.
@@ -177,7 +227,7 @@ async fn launch_interactive(
     // this after both provider branches so provider keys remain independent.
     auth::ensure_file_credentials_store()?;
 
-    let forwarded = chatgpt_codex_argv(model, reasoning, args);
+    let forwarded = chatgpt_codex_argv(model, reasoning.clone(), args);
 
     let mut revival_hint = None;
     let target_alias = match alias {
@@ -357,14 +407,32 @@ async fn launch_interactive(
     // Tokio's Unix signal handler remains installed for the process lifetime,
     // so keep consuming shutdown signals after the restore instead of leaving
     // a later `kill` swallowed while Codex is still running.
-    let status = match wait_for_child_or_shutdown(&mut child, interrupt)
+    let watch = auto_swap.as_ref().filter(|_| !json);
+    let status = match wait_for_child_or_swap(&mut child, interrupt, watch, &target_alias)
         .await
         .context("waiting for codex")?
     {
-        Ok(status) => status,
-        Err(signal) => {
+        SessionEnd::Exited(status) => status,
+        SessionEnd::Signal(signal) => {
             terminate_child(&mut child, pipes);
             return Ok(shutdown_outcome(signal, Ok(())));
+        }
+        SessionEnd::Swap(next) => {
+            terminate_child(&mut child, pipes);
+            user_println(&format!(
+                "auto-swap: '{target_alias}' is near its usage limit; resuming the session on '{next}'..."
+            ));
+            return Box::pin(launch_interactive(
+                Some(&next),
+                vec!["resume".into(), "--last".into()],
+                json,
+                false,
+                model,
+                reasoning,
+                Some(interrupt),
+                auto_swap,
+            ))
+            .await;
         }
     };
     let captured = join_codex_pipes(pipes);

@@ -300,6 +300,13 @@ Examples:
         /// For a ChatGPT profile, forwarded to Codex as `--model`.
         #[arg(long)]
         model: Option<String>,
+        /// ChatGPT profiles only: watch this session's quota and, at the threshold,
+        /// restart Codex on a better account with `resume --last`
+        #[arg(long)]
+        auto_swap: bool,
+        /// Used percent that triggers --auto-swap
+        #[arg(long, default_value_t = 90.0, requires = "auto_swap")]
+        swap_threshold: f64,
         /// Codex argv; prefer `--` before this so flags are not parsed by paper-codex-switch
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,

@@ -138,11 +138,13 @@ async fn rank_pool(current: &str) -> Result<Vec<(usage::Candidate, usage::UsageI
 }
 
 /// One check-and-maybe-switch decision (nothing is switched here).
-pub(crate) async fn tick(opts: &AutoOptions, current: &str) -> Result<Decision> {
+/// `current` is the account being watched; `marker` is the account whose
+/// credentials are live in auth.json (they differ during a `launch` session).
+pub(crate) async fn tick(opts: &AutoOptions, current: &str, marker: &str) -> Result<Decision> {
     let cfg = config::get();
     let safety_7d = cfg.use_cfg.safety_margin_7d;
     let path = profile::profile_auth_path(current)?;
-    let live = usage::fetch_usage_retried_force(current, &path, current)
+    let live = usage::fetch_usage_retried_force(current, &path, marker)
         .await
         .map_err(|e| anyhow::anyhow!("usage check for '{current}' failed: {}", e.summary))?;
     let limited_now = live.account_limited;
@@ -161,7 +163,7 @@ pub(crate) async fn tick(opts: &AutoOptions, current: &str) -> Result<Decision> 
         return Ok(first);
     }
 
-    let pool = rank_pool(current).await?;
+    let pool = rank_pool(marker).await?;
     let ranked: Vec<_> = pool.iter().map(|(c, _, s)| (c.clone(), *s)).collect();
     Ok(decide(current, &ranked, limited_now, opts, safety_7d))
 }
@@ -195,7 +197,7 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
         }
         let in_cooldown = last_switch.is_some_and(|t| t.elapsed() < opts.cooldown);
 
-        let code = match tick(&opts, &current).await {
+        let code = match tick(&opts, &current, &current).await {
             Err(e) => {
                 // Fail safe: keep the current account and retry next tick.
                 emit(
