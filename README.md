@@ -4,9 +4,9 @@
 
 Save several Codex logins, see every account's 5-hour and weekly quota in one dashboard, switch with one command, and let `auto` move you to a fresh account before the active one runs dry.
 
-![TUI dashboard](docs/tui.png)
+![paper-codex-switch list](docs/list.png)
 
-> Forked from [xjoker/codex-switch](https://github.com/xjoker/codex-switch) (MIT); the auto-swap design follows [claude-swap](https://github.com/realiti4/claude-swap). The screenshots above and below come from upstream and show its `codex-switch` name; the interface is the same except that this fork's `list` also numbers the accounts.
+> Inspired by [codex-switch](https://github.com/xjoker/codex-switch) and [claude-swap](https://github.com/realiti4/claude-swap). Example output above uses made-up accounts.
 
 ## Features
 
@@ -53,8 +53,6 @@ paper-codex-switch use work       # ...or by alias
 paper-codex-switch tui            # interactive dashboard
 paper-codex-switch launch         # start Codex on the best account
 ```
-
-![list output](docs/cli.png)
 
 `use <n>` uses the numbers shown by `list` (alphabetical by alias); a profile literally named `2` wins over position 2.
 
@@ -116,4 +114,4 @@ Releases: push a `v<version>` tag; `.github/workflows/release.yml` builds the fo
 
 ## License
 
-MIT. Original work © xjoker; modifications © Cazorlas.
+MIT. Includes code adapted from [codex-switch](https://github.com/xjoker/codex-switch) (© xjoker), whose MIT notice is kept in `LICENSE` as the license requires.
