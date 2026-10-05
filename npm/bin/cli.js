@@ -57,6 +57,37 @@ if (args[0] === "self-update") {
   process.exit(0);
 }
 
+// `uninstall [--purge | --keep-data]`: handled here so it works even when the binary is
+// missing or blocked, and because a running binary cannot delete itself.
+if (args[0] === "uninstall") {
+  const dataDir = process.env.PAPER_CODEX_SWITCH_HOME || path.join(os.homedir(), ".paper-codex-switch");
+  const finish = (wipe) => {
+    if (isWin) spawnSync("taskkill", ["/IM", "paper-codex-switch.exe", "/F"], { stdio: "ignore" });
+    else spawnSync("pkill", ["-x", "paper-codex-switch"]);
+    if (isWin) {
+      const vbs = path.join(process.env.APPDATA || "", "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "paper-codex-switch-auto.vbs");
+      try { fs.rmSync(vbs, { force: true }); } catch {}
+    }
+    if (wipe) {
+      try { fs.rmSync(dataDir, { recursive: true, force: true }); console.log(`deleted ${dataDir}`); }
+      catch (e) { console.error(`could not delete ${dataDir}: ${e.message}`); }
+    } else {
+      console.log(`kept your accounts and settings in ${dataDir}`);
+    }
+    const r = spawnSync("npm", ["rm", "-g", "paper-codex-switch"], { stdio: "inherit", shell: isWin });
+    console.log(r.status === 0 ? "paper-codex-switch uninstalled" : "npm could not remove the package; run: npm rm -g paper-codex-switch");
+    process.exit(r.status || 0);
+  };
+  if (args.includes("--purge")) finish(true);
+  else if (args.includes("--keep-data") || !process.stdin.isTTY) finish(false);
+  else {
+    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`Also delete your saved accounts and settings (${dataDir})? [y/N] `, (a) => {
+      rl.close();
+      finish(/^y(es)?$/i.test(a.trim()));
+    });
+  }
+} else {
 // npm may skip the postinstall script (allow-scripts); fetch the binary on first run instead.
 if (!fs.existsSync(exe)) {
   const r = spawnSync(process.execPath, [path.join(__dirname, "..", "install.js")], { stdio: "inherit" });
@@ -86,3 +117,4 @@ if (r.error) {
   process.exit(1);
 }
 process.exit(r.status ?? 1);
+}

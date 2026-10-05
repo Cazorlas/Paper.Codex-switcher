@@ -140,10 +140,12 @@ fn running_pid() -> Option<u64> {
 }
 
 /// `auto --start`: launch a detached, windowless `auto` and return at once.
-pub(crate) fn start_cmd(opts: &AutoOptions) -> Result<()> {
+pub(crate) fn start_cmd(opts: &AutoOptions, at_login: bool) -> Result<()> {
     if let Some(pid) = running_pid() {
         println!("auto is already running (pid {pid})");
-        let _ = startup_cmd(true, opts);
+        if at_login {
+            let _ = startup_cmd(true, opts);
+        }
         return Ok(());
     }
     let exe = std::env::current_exe().context("locating the paper-codex-switch executable")?;
@@ -193,8 +195,9 @@ pub(crate) fn start_cmd(opts: &AutoOptions) -> Result<()> {
         "{}",
         color::success(&format!("auto started in the background (pid {})", child.id()))
     );
-    // Starting also means "keep it running": enable start at login.
-    if let Err(e) = startup_cmd(true, opts) {
+    // Start at login is opt-in: writing to the Startup folder is a persistence
+    // behaviour that antivirus heuristics dislike, so it is never done silently.
+    if at_login && let Err(e) = startup_cmd(true, opts) {
         println!("  (not set to start at login: {e})");
     }
     println!("  check with `paper-codex-switch auto --status`, stop with `paper-codex-switch auto --stop`");
@@ -203,7 +206,7 @@ pub(crate) fn start_cmd(opts: &AutoOptions) -> Result<()> {
 
 /// `auto --stop`: end the background `auto`.
 pub(crate) fn stop_cmd(opts: &AutoOptions) -> Result<()> {
-    // Stopping also means "do not come back at the next login".
+    // Also remove a login entry created earlier with `--start --at-login`.
     let _ = startup_cmd(false, opts);
     let Some(pid) = running_pid() else {
         println!("auto is not running");

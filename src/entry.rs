@@ -220,6 +220,7 @@ async fn dispatch(
             status,
             start,
             stop,
+            at_login,
         } => {
             let opts = commands::AutoOptions {
                 threshold,
@@ -237,7 +238,7 @@ async fn dispatch(
                 return commands::auto_stop_cmd(&opts);
             }
             if start {
-                return commands::auto_start_cmd(&opts);
+                return commands::auto_start_cmd(&opts, at_login);
             }
             commands::auto_cmd(opts).await?
         }

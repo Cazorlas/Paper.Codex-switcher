@@ -98,12 +98,24 @@ To remove accounts you no longer use: `list`, then `delete <alias>`. Deleting is
 ```bash
 paper-codex-switch self-update --check   # is there a newer version?
 paper-codex-switch self-update           # update (npm installs)
-npm rm -g paper-codex-switch             # uninstall
 ```
 
 Once a day the command looks for a newer version in the background and prints a one-line hint when there is one; it never installs by itself. `self-update` stops a background `auto` (Windows locks the running `.exe`), runs `npm i -g paper-codex-switch@latest`, then restarts `auto` if it was started from the Startup script. Installed with cargo? Re-run `cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher`.
 
-Your accounts stay in `~/.paper-codex-switch`; delete that folder to remove them too.
+### Uninstall
+
+```bash
+paper-codex-switch uninstall              # stops auto, removes the login entry and the npm package,
+                                          # then asks whether to delete your saved accounts [y/N]
+paper-codex-switch uninstall --purge      # ...and delete the accounts and settings without asking
+paper-codex-switch uninstall --keep-data  # ...keep them without asking
+```
+
+This works even if Windows Security has blocked the program, because it runs from the npm launcher. Installed with cargo instead? `cargo uninstall paper-codex-switch`, then delete `~/.paper-codex-switch` if you want the data gone too.
+
+### Windows Security says "Trojan:Win32/...!ml"?
+
+The `.exe` is not code-signed yet, and Microsoft Defender's machine-learning detection sometimes flags new unsigned programs. You can check the file against the SHA256 shown on the release page. If Defender quarantines it: Windows Security → Protection history → *Allow on device*, then re-run the command (or `npm i -g paper-codex-switch@latest`).
 
 ## Automatic switching
 
@@ -143,12 +155,13 @@ At the threshold it stops Codex and starts it again on the better account with `
 ### Run `auto` in the background
 
 ```bash
-paper-codex-switch auto --start     # start now, windowless, and at every login (Windows)
-paper-codex-switch auto --stop      # stop now and stop it starting at login
+paper-codex-switch auto --start              # start now, windowless
+paper-codex-switch auto --start --at-login   # ...and at every Windows login (opt-in)
+paper-codex-switch auto --stop               # stop (also removes the login entry)
 paper-codex-switch auto --status    # running? last check, last action, log path
 ```
 
-`--start` accepts the same options as `auto` (`--threshold 80 --interval 120 ...`); they are remembered for the login start. Starting at login uses the Windows Startup folder, so no admin rights are needed. On macOS/Linux `--start`/`--stop` still work for the current session; to start at boot use cron (`@reboot paper-codex-switch auto --start`) or a systemd user unit.
+`--start` accepts the same options as `auto` (`--threshold 80 --interval 120 ...`); `--at-login` writes a small script to the Windows Startup folder (no admin rights needed); it is off unless you ask for it, because some antivirus tools dislike programs that add themselves to Startup. On macOS/Linux `--start`/`--stop` still work for the current session; to start at boot use cron (`@reboot paper-codex-switch auto --start`) or a systemd user unit.
 
 Cron / Task Scheduler alternative: `paper-codex-switch auto --once --json >> ~/.paper-codex-switch/auto.log 2>&1` every few minutes.
 
