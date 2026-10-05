@@ -40,7 +40,7 @@ Or build from source (Rust 1.88+):
 cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher
 ```
 
-Data lives in `~/.paper-codex-switch` (override with `PAPER_CODEX_SWITCH_HOME`). `self-update` is disabled; update with npm or cargo.
+Data lives in `~/.paper-codex-switch` (override with `PAPER_CODEX_SWITCH_HOME`). Update with `paper-codex-switch self-update`.
 
 ## Setup (first time)
 
@@ -96,9 +96,12 @@ To remove accounts you no longer use: `list`, then `delete <alias>`. Deleting is
 ### Update / uninstall
 
 ```bash
-npm i -g paper-codex-switch@latest    # update
-npm rm -g paper-codex-switch          # uninstall
+paper-codex-switch self-update --check   # is there a newer version?
+paper-codex-switch self-update           # update (npm installs)
+npm rm -g paper-codex-switch             # uninstall
 ```
+
+Once a day the command looks for a newer version in the background and prints a one-line hint when there is one; it never installs by itself. `self-update` stops a background `auto` (Windows locks the running `.exe`), runs `npm i -g paper-codex-switch@latest`, then restarts `auto` if it was started from the Startup script. Installed with cargo? Re-run `cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher`.
 
 Your accounts stay in `~/.paper-codex-switch`; delete that folder to remove them too.
 

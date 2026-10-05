@@ -16,7 +16,7 @@ pub(crate) async fn self_update_cmd(
     let _ = (check, version, dev, stable, json);
     if true {
         anyhow::bail!(
-            "self-update is disabled in paper-codex-switch; rebuild with `cargo install --path .`"
+            "this binary was run directly; update with `paper-codex-switch self-update` from the npm install, or reinstall (`npm i -g paper-codex-switch@latest` / `cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher`)"
         );
     }
     // Resolve the effective channel:
