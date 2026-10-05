@@ -23,3 +23,28 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.asset }}
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm trusted publishing (OIDC), no token needed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Version must match the tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          [ "$tag" = "$cargo_version" ] || { echo "tag $tag != Cargo.toml $cargo_version"; exit 1; }
+          cd npm && npm version "$tag" --no-git-tag-version --allow-same-version
+      - name: Package files
+        run: cp README.md LICENSE THIRD_PARTY_NOTICES.md npm/
+      - name: Point README image at GitHub
+        run: sed -i 's|(docs/list.png)|(https://raw.githubusercontent.com/Cazorlas/Paper.Codex-switcher/main/docs/list.png)|' npm/README.md
+      - run: npm publish --access public
+        working-directory: npm
