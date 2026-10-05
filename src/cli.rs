@@ -198,6 +198,12 @@ Examples:
         /// Show whether a background `auto` is running and what it did last
         #[arg(long)]
         status: bool,
+        /// Start `auto` in the background (no window) and at every login (Windows)
+        #[arg(long)]
+        start: bool,
+        /// Stop the background `auto` and stop it starting at login
+        #[arg(long)]
+        stop: bool,
     },
     /// List all profiles with account info, usage, and availability
     List {

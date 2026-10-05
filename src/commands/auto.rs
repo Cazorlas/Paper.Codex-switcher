@@ -124,6 +124,149 @@ fn write_status(wait: Duration) {
     }
 }
 
+fn read_status() -> Option<serde_json::Value> {
+    status_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| serde_json::from_str(&t).ok())
+}
+
+/// A background `auto` is alive when its heartbeat is newer than two check cycles.
+fn running_pid() -> Option<u64> {
+    let v = read_status()?;
+    let age = auth::now_unix_secs() - v["at"].as_i64()?;
+    let next = v["next_check_in_secs"].as_i64().unwrap_or(60);
+    (age <= next * 2 + 120).then(|| v["pid"].as_u64()).flatten()
+}
+
+/// `auto --start`: launch a detached, windowless `auto` and return at once.
+pub(crate) fn start_cmd(opts: &AutoOptions) -> Result<()> {
+    if let Some(pid) = running_pid() {
+        println!("auto is already running (pid {pid})");
+        let _ = startup_cmd(true, opts);
+        return Ok(());
+    }
+    let exe = std::env::current_exe().context("locating the paper-codex-switch executable")?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.args([
+        "auto",
+        "--threshold",
+        &opts.threshold.to_string(),
+        "--margin",
+        &opts.margin.to_string(),
+        "--interval",
+        &opts.interval.as_secs().to_string(),
+        "--cooldown",
+        &opts.cooldown.as_secs().to_string(),
+    ])
+    .stdin(std::process::Stdio::null())
+    .stdout(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // DETACHED_PROCESS | CREATE_NO_WINDOW
+        cmd.creation_flags(0x0000_0008 | 0x0800_0000);
+        // The child would otherwise inherit our stdout/stderr pipe, and a caller
+        // reading `... | tail` would wait for the background process to exit.
+        unsafe extern "system" {
+            fn GetStdHandle(n: u32) -> *mut core::ffi::c_void;
+            fn SetHandleInformation(h: *mut core::ffi::c_void, mask: u32, flags: u32) -> i32;
+        }
+        for std_handle in [-11i32 as u32, -12i32 as u32] {
+            // SAFETY: plain Win32 calls on this process's own std handles.
+            unsafe {
+                let h = GetStdHandle(std_handle);
+                if !h.is_null() && h as isize != -1 {
+                    SetHandleInformation(h, 1, 0); // clear HANDLE_FLAG_INHERIT
+                }
+            }
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let child = cmd.spawn().context("starting the background auto")?;
+    println!(
+        "{}",
+        color::success(&format!("auto started in the background (pid {})", child.id()))
+    );
+    // Starting also means "keep it running": enable start at login.
+    if let Err(e) = startup_cmd(true, opts) {
+        println!("  (not set to start at login: {e})");
+    }
+    println!("  check with `paper-codex-switch auto --status`, stop with `paper-codex-switch auto --stop`");
+    Ok(())
+}
+
+/// `auto --stop`: end the background `auto`.
+pub(crate) fn stop_cmd(opts: &AutoOptions) -> Result<()> {
+    // Stopping also means "do not come back at the next login".
+    let _ = startup_cmd(false, opts);
+    let Some(pid) = running_pid() else {
+        println!("auto is not running");
+        return Ok(());
+    };
+    #[cfg(windows)]
+    let status = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/F"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+    #[cfg(not(windows))]
+    let status = std::process::Command::new("kill")
+        .arg(pid.to_string())
+        .status();
+    if !status.is_ok_and(|s| s.success()) {
+        anyhow::bail!("could not stop pid {pid}; end it manually");
+    }
+    if let Ok(path) = status_path() {
+        let _ = std::fs::remove_file(path);
+    }
+    append_log(&format!("stopped by user (pid {pid})"));
+    println!("{}", color::success(&format!("auto stopped (pid {pid})")));
+    Ok(())
+}
+
+/// `auto --startup on|off`: start `auto` at every Windows login (Startup folder, no admin).
+pub(crate) fn startup_cmd(on: bool, opts: &AutoOptions) -> Result<()> {
+    #[cfg(windows)]
+    {
+        let dir = std::env::var_os("APPDATA")
+            .map(std::path::PathBuf::from)
+            .context("APPDATA is not set")?
+            .join(r"Microsoft\Windows\Start Menu\Programs\Startup");
+        let file = dir.join("paper-codex-switch-auto.vbs");
+        if on {
+            let line = format!(
+                "CreateObject(\"Wscript.Shell\").Run \"cmd /c paper-codex-switch auto --threshold {} --margin {} --interval {} --cooldown {}\", 0, False
+",
+                opts.threshold,
+                opts.margin,
+                opts.interval.as_secs(),
+                opts.cooldown.as_secs()
+            );
+            std::fs::write(&file, line).with_context(|| format!("writing {}", file.display()))?;
+            println!("  auto will also start at every login");
+        } else if file.exists() {
+            std::fs::remove_file(&file)?;
+            println!("  auto will no longer start at login");
+        } else {
+            
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (on, opts);
+        anyhow::bail!(
+            "--startup is Windows-only; on macOS/Linux use cron (`@reboot paper-codex-switch auto --start`) or a systemd user unit"
+        )
+    }
+}
+
 /// `auto --status`: is a background `auto` alive, and what did it do last?
 pub(crate) fn status_cmd(json: bool) -> Result<()> {
     let now = auth::now_unix_secs();

@@ -140,25 +140,17 @@ paper-codex-switch launch --auto-swap [--swap-threshold 85] [-- codex args]
 
 At the threshold it stops Codex and starts it again on the better account with `codex resume --last`. The turn that was in flight is lost, the conversation is resumed.
 
-### Is it running?
+### Run `auto` in the background
 
 ```bash
+paper-codex-switch auto --start     # start now, windowless, and at every login (Windows)
+paper-codex-switch auto --stop      # stop now and stop it starting at login
 paper-codex-switch auto --status    # running? last check, last action, log path
 ```
 
-`auto` writes a heartbeat to `~/.paper-codex-switch/auto-status.json` and every decision to `~/.paper-codex-switch/auto.log`, so a hidden background run leaves a trail (`Get-Content ~\.paper-codex-switchuto.log -Tail 20 -Wait` follows it live on PowerShell).
+`--start` accepts the same options as `auto` (`--threshold 80 --interval 120 ...`); they are remembered for the login start. Starting at login uses the Windows Startup folder, so no admin rights are needed. On macOS/Linux `--start`/`--stop` still work for the current session; to start at boot use cron (`@reboot paper-codex-switch auto --start`) or a systemd user unit.
 
-### Run `auto` in the background on Windows
-
-Start it automatically at every login, no admin needed: create `paper-codex-switch-auto.vbs` in the folder opened by `Win+R` → `shell:startup` with this single line:
-
-```vbs
-CreateObject("Wscript.Shell").Run "cmd /c paper-codex-switch auto --threshold 90", 0, False
-```
-
-Double-click it to start now. Stop with `Stop-Process -Name paper-codex-switch`; stop it for good by deleting the file.
-
-On macOS/Linux use cron: `*/5 * * * * paper-codex-switch auto --once --json >> ~/.paper-codex-switch/auto.log 2>&1`.
+Cron / Task Scheduler alternative: `paper-codex-switch auto --once --json >> ~/.paper-codex-switch/auto.log 2>&1` every few minutes.
 
 ## Security
 

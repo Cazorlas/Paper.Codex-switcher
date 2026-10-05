@@ -218,11 +218,10 @@ async fn dispatch(
             once,
             dry_run,
             status,
+            start,
+            stop,
         } => {
-            if status {
-                return commands::auto_status_cmd(json);
-            }
-            commands::auto_cmd(commands::AutoOptions {
+            let opts = commands::AutoOptions {
                 threshold,
                 margin,
                 interval: std::time::Duration::from_secs(interval.max(5)),
@@ -230,8 +229,17 @@ async fn dispatch(
                 once,
                 dry_run,
                 json,
-            })
-            .await?
+            };
+            if status {
+                return commands::auto_status_cmd(json);
+            }
+            if stop {
+                return commands::auto_stop_cmd(&opts);
+            }
+            if start {
+                return commands::auto_start_cmd(&opts);
+            }
+            commands::auto_cmd(opts).await?
         }
         Commands::List { force } => commands::list_cmd(force, json, auth_handled).await?,
         Commands::ResetCard { alias, yes } => commands::reset_card_cmd(&alias, yes, json).await?,
