@@ -114,4 +114,4 @@ Releases: push a `v<version>` tag; `.github/workflows/release.yml` builds the fo
 
 ## License
 
-MIT. Includes code adapted from [codex-switch](https://github.com/xjoker/codex-switch) (© xjoker), whose MIT notice is kept in `LICENSE` as the license requires.
+MIT, © Cazorlas — see `LICENSE`. Parts of the code are adapted from [codex-switch](https://github.com/xjoker/codex-switch) (MIT); its notice is in `THIRD_PARTY_NOTICES.md`.
