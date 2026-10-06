@@ -217,10 +217,6 @@ async fn dispatch(
             cooldown,
             once,
             dry_run,
-            status,
-            start,
-            stop,
-            at_login,
         } => {
             let opts = commands::AutoOptions {
                 threshold,
@@ -231,15 +227,6 @@ async fn dispatch(
                 dry_run,
                 json,
             };
-            if status {
-                return commands::auto_status_cmd(json);
-            }
-            if stop {
-                return commands::auto_stop_cmd(&opts);
-            }
-            if start {
-                return commands::auto_start_cmd(&opts, at_login);
-            }
             commands::auto_cmd(opts).await?
         }
         Commands::List { force } => commands::list_cmd(force, json, auth_handled).await?,

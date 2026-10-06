@@ -45,15 +45,7 @@ if (args[0] === "self-update") {
   }
   const r = spawnSync("npm", ["i", "-g", "paper-codex-switch@latest"], { stdio: "inherit", shell: isWin });
   if (r.status !== 0) process.exit(r.status || 1);
-  if (running) {
-    const vbs = isWin ? path.join(process.env.APPDATA || "", "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "paper-codex-switch-auto.vbs") : null;
-    if (vbs && fs.existsSync(vbs)) {
-      spawn("wscript.exe", [vbs], { detached: true, stdio: "ignore" }).unref();
-      console.log("restarted the background auto");
-    } else {
-      console.log("start `paper-codex-switch auto` again to resume automatic switching");
-    }
-  }
+  if (running) console.log("start `paper-codex-switch auto` again to resume automatic switching");
   process.exit(0);
 }
 

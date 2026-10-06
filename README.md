@@ -12,7 +12,7 @@ Save several Codex logins, see every account's 5-hour and weekly quota in one da
 
 - Save, import, rename and recoverably delete Codex profiles; switch by name, by number, or to the best account automatically.
 - Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, plan, reset cards.
-- **`auto`**: background loop that switches accounts when the active one nears its limit.
+- **`auto`**: loop that switches accounts when the active one nears its limit (leave the window open, minimized).
 - **`launch --auto-swap`**: run Codex and, at the threshold, restart the session on a better account with `codex resume --last`.
 - Custom Responses-compatible API providers (beta), proxies, JSON output.
 - Windows, macOS and Linux.
@@ -100,12 +100,12 @@ paper-codex-switch self-update --check   # is there a newer version?
 paper-codex-switch self-update           # update (npm installs)
 ```
 
-Once a day the command looks for a newer version in the background and prints a one-line hint when there is one; it never installs by itself. `self-update` stops a background `auto` (Windows locks the running `.exe`), runs `npm i -g paper-codex-switch@latest`, then restarts `auto` if it was started from the Startup script. Installed with cargo? Re-run `cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher`.
+Once a day the command looks for a newer version in the background and prints a one-line hint when there is one; it never installs by itself. `self-update` closes a running `auto` (Windows locks the running `.exe`) and runs `npm i -g paper-codex-switch@latest`; start `auto` again afterwards. Installed with cargo? Re-run `cargo install --git https://github.com/Cazorlas/Paper.Codex-switcher`.
 
 ### Uninstall
 
 ```bash
-paper-codex-switch uninstall              # stops auto, removes the login entry and the npm package,
+paper-codex-switch uninstall              # closes auto, removes the npm package,
                                           # then asks whether to delete your saved accounts [y/N]
 paper-codex-switch uninstall --purge      # ...and delete the accounts and settings without asking
 paper-codex-switch uninstall --keep-data  # ...keep them without asking
@@ -152,18 +152,15 @@ paper-codex-switch launch --auto-swap [--swap-threshold 85] [-- codex args]
 
 At the threshold it stops Codex and starts it again on the better account with `codex resume --last`. The turn that was in flight is lost, the conversation is resumed.
 
-### Run `auto` in the background
+### Keeping it running
+
+`auto` runs in the terminal window where you start it. Leave that window open and minimize it; it checks quietly and prints a line only when something happens or fails. Closing the window stops it, and starting it again is just `paper-codex-switch auto`.
+
+There is deliberately no hidden background service: nothing registers itself to start with Windows, so there is nothing extra to set up or remove. If you do want it unattended, run the single check from your scheduler (cron, Windows Task Scheduler):
 
 ```bash
-paper-codex-switch auto --start              # start now, windowless
-paper-codex-switch auto --start --at-login   # ...and at every Windows login (opt-in)
-paper-codex-switch auto --stop               # stop (also removes the login entry)
-paper-codex-switch auto --status    # running? last check, last action, log path
+paper-codex-switch auto --once --json
 ```
-
-`--start` accepts the same options as `auto` (`--threshold 80 --interval 120 ...`); `--at-login` writes a small script to the Windows Startup folder (no admin rights needed); it is off unless you ask for it, because some antivirus tools dislike programs that add themselves to Startup. On macOS/Linux `--start`/`--stop` still work for the current session; to start at boot use cron (`@reboot paper-codex-switch auto --start`) or a systemd user unit.
-
-Cron / Task Scheduler alternative: `paper-codex-switch auto --once --json >> ~/.paper-codex-switch/auto.log 2>&1` every few minutes.
 
 ## Security
 
