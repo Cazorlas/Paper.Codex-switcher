@@ -11,7 +11,7 @@ Save several Codex logins, see every account's 5-hour and weekly quota in one da
 ## Features
 
 - Save, import, rename and recoverably delete Codex profiles; switch by name, by number, or to the best account automatically.
-- Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, plan, reset cards.
+- Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, plan, reset cards, and the date each plan runs until (`Plan until`, yellow in the last 7 days).
 - **`auto`**: loop that switches accounts when the active one nears its limit (leave the window open, minimized).
 - **`launch --auto-swap`**: run Codex and, at the threshold, restart the session on a better account with `codex resume --last`.
 - Custom Responses-compatible API providers (beta), proxies, JSON output.
@@ -70,6 +70,8 @@ paper-codex-switch auto           # switch automatically near the limit (see bel
 ```
 
 ![paper-codex-switch list](docs/list.png)
+
+The plan end date comes from the account's login token, so it is as fresh as the last token refresh; `lapsed?` means the recorded end has passed (the plan ended, or it renewed and the token has not refreshed yet; `list --force` or `login <alias>` refreshes it). `--json list` has it as `account.subscription_until` (unix seconds).
 
 `use <n>` uses the numbers shown by `list` (alphabetical by alias); a profile literally named `2` wins over position 2.
 

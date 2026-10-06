@@ -22,6 +22,9 @@ pub struct AccountInfo {
     pub user_id: Option<String>,
     pub workspace_name: Option<String>,
     pub organizations: Vec<OrgInfo>,
+    /// End of the current paid period (unix seconds), from the id_token claim
+    /// `chatgpt_subscription_active_until`. It is as fresh as the last token refresh.
+    pub subscription_until: Option<i64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,6 +161,12 @@ pub fn parse_account_info(auth: &Value) -> AccountInfo {
             .map(|organization| organization.title.clone())
     })();
 
+    let subscription_until = auth_claims
+        .and_then(|a| a.get("chatgpt_subscription_active_until"))
+        .and_then(|v| v.as_str())
+        .and_then(|text| chrono::DateTime::parse_from_rfc3339(text).ok())
+        .map(|dt| dt.timestamp());
+
     AccountInfo {
         email,
         plan_type,
@@ -166,7 +175,36 @@ pub fn parse_account_info(auth: &Value) -> AccountInfo {
         user_id,
         workspace_name,
         organizations,
+        subscription_until,
     }
+}
+
+/// How close the end of the paid period is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExpiryLevel {
+    Unknown,
+    Ok,
+    /// Ends within a week.
+    Soon,
+    /// The recorded end is in the past: the plan lapsed, or it renewed and the
+    /// token has not been refreshed yet.
+    Past,
+}
+
+/// Short text for a table cell, e.g. `10-11 (5d)`, plus its urgency.
+pub fn subscription_label(until: Option<i64>, now: i64) -> (String, ExpiryLevel) {
+    let Some(until) = until else {
+        return ("--".into(), ExpiryLevel::Unknown);
+    };
+    if until <= now {
+        return ("lapsed?".into(), ExpiryLevel::Past);
+    }
+    let days = (until - now + 86_399) / 86_400;
+    let date = chrono::DateTime::from_timestamp(until, 0)
+        .map(|utc| utc.with_timezone(&chrono::Local).format("%m-%d").to_string())
+        .unwrap_or_else(|| "--".into());
+    let level = if days <= 7 { ExpiryLevel::Soon } else { ExpiryLevel::Ok };
+    (format!("{date} ({days}d)"), level)
 }
 
 /// Extract organizations list from JWT claims
@@ -547,5 +585,34 @@ mod tests {
     #[test]
     fn test_is_token_expiring_invalid_jwt() {
         assert_eq!(is_token_expiring("not-a-jwt", 60), None);
+    }
+
+    #[test]
+    fn subscription_label_counts_days_and_flags_the_last_week() {
+        let now = 1_000_000_000;
+        assert_eq!(subscription_label(None, now).1, ExpiryLevel::Unknown);
+        let (text, level) = subscription_label(Some(now + 3 * 86_400 - 60), now);
+        assert!(text.ends_with("(3d)"), "{text}");
+        assert_eq!(level, ExpiryLevel::Soon);
+        let (text, level) = subscription_label(Some(now + 20 * 86_400), now);
+        assert!(text.ends_with("(20d)"), "{text}");
+        assert_eq!(level, ExpiryLevel::Ok);
+        assert_eq!(subscription_label(Some(now - 1), now), ("lapsed?".into(), ExpiryLevel::Past));
+    }
+
+    #[test]
+    fn subscription_end_is_read_from_the_id_token_claim() {
+        let claims = serde_json::json!({
+            "https://api.openai.com/auth": {
+                "chatgpt_subscription_active_until": "2026-10-11T17:45:55+00:00"
+            }
+        });
+        let payload = base64::Engine::encode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            serde_json::to_vec(&claims).unwrap(),
+        );
+        let auth = serde_json::json!({"tokens": {"id_token": format!("x.{payload}.y")}});
+        let info = parse_account_info(&auth);
+        assert_eq!(info.subscription_until, Some(1_791_740_755));
     }
 }

@@ -33,6 +33,8 @@ pub struct JsonAccount {
     pub plan: Option<String>,
     pub account_id: Option<String>,
     pub workspace_name: Option<String>,
+    /// End of the current paid period, unix seconds (as of the last token refresh)
+    pub subscription_until: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -182,6 +184,7 @@ pub fn account_to_json(info: &AccountInfo, api_plan: Option<&str>) -> JsonAccoun
             .or_else(|| info.plan_type.clone()),
         account_id: info.account_id.clone(),
         workspace_name: info.workspace_name.clone(),
+        subscription_until: info.subscription_until,
     }
 }
 

@@ -306,9 +306,9 @@ fn table_text_widths(
         plan: desired("Plan", plans).max(4),
     };
 
-    // Base borders, spacing, marker and fixed columns consume 44 cells. The
+    // Base borders, spacing, marker and fixed columns consume 55 cells. The
     // optional 5h pair and Credits column add their widths plus spacing.
-    let fixed_width = 44 + u16::from(show_5h) * 20 + credits_width.unwrap_or(0);
+    let fixed_width = 55 + u16::from(show_5h) * 20 + credits_width.unwrap_or(0);
     let budget = total_width.saturating_sub(fixed_width).max(14);
     let total = u32::from(widths.alias) + u32::from(widths.email) + u32::from(widths.plan);
     let mut excess = total.saturating_sub(u32::from(budget));
@@ -388,6 +388,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         header_cells.push(Cell::from("5h Reset").style(hdr));
     }
     header_cells.push(Cell::from("7d Reset").style(hdr));
+    header_cells.push(Cell::from("Plan until").style(hdr));
     header_cells.push(Cell::from("Cards").style(hdr));
     if show_credits {
         header_cells.push(Cell::from("Credits").style(hdr));
@@ -610,6 +611,14 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
                 cells.push(Cell::from(reset_5h).style(base().fg(reset_5h_color)));
             }
             cells.push(Cell::from(reset_7d).style(base().fg(reset_7d_color)));
+            let (until_text, until_level) =
+                crate::jwt::subscription_label(entry.info.subscription_until, now);
+            let until_color = match until_level {
+                crate::jwt::ExpiryLevel::Soon => C_YELLOW,
+                crate::jwt::ExpiryLevel::Ok => C_GRAY,
+                _ => DIM,
+            };
+            cells.push(Cell::from(until_text).style(base().fg(until_color)));
             cells.push(Cell::from(reset_cards).style(base().fg(reset_cards_color)));
             if show_credits {
                 cells.push(Cell::from(credits_text).style(base().fg(credits_color)));
@@ -696,6 +705,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         constraints.push(Constraint::Length(12)); // 5h reset
     }
     constraints.push(Constraint::Length(12)); // 7d reset
+    constraints.push(Constraint::Length(11)); // plan until
     constraints.push(Constraint::Length(7)); // reset cards
     if let Some(credits_width) = credits_width {
         constraints.push(Constraint::Length(credits_width.saturating_sub(1)));

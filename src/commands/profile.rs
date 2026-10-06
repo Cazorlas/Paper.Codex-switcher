@@ -285,6 +285,16 @@ pub(crate) async fn list_cmd(force: bool, json: bool, auth_already_handled: bool
                 };
                 print!("  {}", color::plan(&label, effective_plan));
             }
+            let (exp_text, exp_level) =
+                jwt::subscription_label(row.info.subscription_until, auth::now_unix_secs());
+            if exp_level != jwt::ExpiryLevel::Unknown {
+                let text = format!("until {exp_text}");
+                match exp_level {
+                    jwt::ExpiryLevel::Soon => print!("  {}", color::warn(&text)),
+                    jwt::ExpiryLevel::Past => print!("  {}", color::dim(&text)),
+                    _ => print!("  {}", color::dim(&text)),
+                }
+            }
             println!();
             match usage_result {
                 Ok(u) => print_usage_line(&u),
