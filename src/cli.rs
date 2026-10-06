@@ -169,6 +169,8 @@ pub enum Commands {
     #[command(
         after_help = "Polls the active account's 5h and 7d windows. When either reaches --threshold, switches to the eligible account with the most headroom (never to one that is itself over the threshold or within --margin points of the current one). A cooldown stops flip-flopping; when every account is exhausted it backs off to a slow cadence.
 
+`auto` runs in this window: leave it open (you can minimize it); stop it with Ctrl+C or by closing the window.
+
 --once does a single check for cron: exit 0 switched, 1 error, 2 nothing to do, 3 blocked (no viable target).
 
 Examples:

@@ -187,6 +187,20 @@ fn apply(current: &str, alias: &str) -> Result<bool> {
 
 pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
     auth::ensure_file_credentials_store()?;
+    if !opts.once && !opts.json {
+        println!(
+            "{}",
+            color::success(&format!(
+                "auto is running: switches accounts at {:.0}% (5h or 7d), checks every {}s.",
+                opts.threshold,
+                opts.interval.as_secs()
+            ))
+        );
+        println!(
+            "{}",
+            color::dim("Leave this window open (you can minimize it). Stop with Ctrl+C or by closing the window.")
+        );
+    }
     let mut last_switch: Option<Instant> = None;
     let mut last_blocked = false;
 

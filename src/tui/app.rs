@@ -1869,15 +1869,33 @@ impl App {
 
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.update_rx = Some(rx);
-        let is_dev = crate::update::current_version().contains("-dev");
+        // This fork is distributed on npm, not through the upstream GitHub releases the
+        // inherited updater looks at, so ask the npm registry for the latest version.
         tokio::spawn(async move {
-            let result = if is_dev {
-                crate::update::check_for_dev_update().await
-            } else {
-                crate::update::check_for_update(false).await
-            };
-            if let Ok(Some(info)) = result {
-                let _ = tx.send(info.latest_version);
+            let latest = async {
+                let client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(8))
+                    .build()
+                    .ok()?;
+                let body: serde_json::Value = client
+                    .get("https://registry.npmjs.org/paper-codex-switch/latest")
+                    .send()
+                    .await
+                    .ok()?
+                    .json()
+                    .await
+                    .ok()?;
+                body["version"].as_str().map(str::to_string)
+            }
+            .await;
+            if let Some(latest) = latest
+                && let (Ok(new), Ok(current)) = (
+                    semver::Version::parse(&latest),
+                    semver::Version::parse(crate::update::current_version()),
+                )
+                && new > current
+            {
+                let _ = tx.send(latest);
             }
         });
     }

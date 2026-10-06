@@ -154,7 +154,7 @@ At the threshold it stops Codex and starts it again on the better account with `
 
 ### Keeping it running
 
-`auto` runs in the terminal window where you start it. Leave that window open and minimize it; it checks quietly and prints a line only when something happens or fails. Closing the window stops it, and starting it again is just `paper-codex-switch auto`.
+`auto` runs in the terminal window where you start it. Leave that window open and minimize it (the TUI help, `h`, lists these commands too); it checks quietly and prints a line only when something happens or fails. Closing the window stops it, and starting it again is just `paper-codex-switch auto`.
 
 There is deliberately no hidden background service: nothing registers itself to start with Windows, so there is nothing extra to set up or remove. If you do want it unattended, run the single check from your scheduler (cron, Windows Task Scheduler):
 

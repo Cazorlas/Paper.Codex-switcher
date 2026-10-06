@@ -238,6 +238,30 @@ fn render_help_popup(
             lines.push(Line::from(spans));
         }
     }
+    if active_tab == Tab::Accounts {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Commands (run in a terminal)".to_string(),
+            heading_style,
+        )));
+        for (cmd, what) in [
+            ("list", "usage of every account, numbered"),
+            ("use [n|alias]", "switch to the best account, or to number n / alias"),
+            ("login [alias]", "add an account (--device on a headless machine)"),
+            ("auto", "switch automatically near the limit; stop with Ctrl+C or close the window"),
+            ("launch --auto-swap", "run Codex and move the session to a better account at the limit"),
+            ("delete / restore", "remove an account / bring a deleted one back"),
+            ("self-update", "update to the newest version"),
+            ("uninstall", "remove the program (asks before deleting your data)"),
+        ] {
+            let mut spans: Vec<Span<'static>> = Vec::new();
+            spans.push(Span::styled("  ", base()));
+            spans.push(Span::styled(cmd.to_string(), key_style));
+            spans.push(Span::styled("  ", base()));
+            spans.push(Span::styled(what.to_string(), label_style));
+            lines.push(Line::from(spans));
+        }
+    }
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  esc / q / h to close \u{2022} j k arrows / PgUp PgDn / mouse wheel to scroll",
