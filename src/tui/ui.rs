@@ -4,7 +4,10 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState},
+    widgets::{
+        Block, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        StatefulWidget, Table, TableState,
+    },
 };
 
 use super::app::{App, Tab, UsageStatus};
@@ -681,8 +684,10 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
     let plans: Vec<&str> = plan_labels.iter().map(String::as_str).collect();
+    // Natural widths: when the window is too narrow the table scrolls sideways
+    // (Left/Right) instead of squeezing every column to a few characters.
     let text_widths = table_text_widths(
-        area.width,
+        4000,
         &aliases,
         &emails,
         &plans,
@@ -711,6 +716,25 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         constraints.push(Constraint::Length(credits_width.saturating_sub(1)));
     }
 
+    let natural: u16 = constraints
+        .iter()
+        .map(|c| match c {
+            Constraint::Length(n) => *n,
+            _ => 0,
+        })
+        .sum::<u16>()
+        .saturating_add(constraints.len().saturating_sub(1) as u16)
+        .saturating_add(2);
+    let overflow = natural > area.width;
+    let max_scroll = natural.saturating_sub(area.width);
+    app.col_scroll = app.col_scroll.min(max_scroll);
+    let col_scroll = app.col_scroll;
+    let title = if overflow {
+        format!("{}\u{2190}\u{2192} scroll ", title)
+    } else {
+        title
+    };
+
     let table = Table::new(rows, constraints)
         .header(header)
         .block(
@@ -723,7 +747,35 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         .row_highlight_style(highlight())
         .style(base());
 
-    f.render_stateful_widget(table, area, &mut table_state);
+    if overflow {
+        // Draw the whole table off screen, then show a window of it.
+        let virtual_area = Rect::new(0, 0, natural, area.height);
+        let mut buf = ratatui::buffer::Buffer::empty(virtual_area);
+        table.render(virtual_area, &mut buf, &mut table_state);
+        let frame_buf = f.buffer_mut();
+        for dy in 0..area.height {
+            for dx in 0..area.width {
+                if let Some(src) = buf.cell((col_scroll + dx, dy)) {
+                    if let Some(dst) = frame_buf.cell_mut((area.x + dx, area.y + dy)) {
+                        *dst = src.clone();
+                    }
+                }
+            }
+        }
+        let mut bar_state = ScrollbarState::new(usize::from(max_scroll) + usize::from(area.width))
+            .viewport_content_length(usize::from(area.width))
+            .position(usize::from(col_scroll));
+        f.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+                .begin_symbol(Some("\u{25c0}"))
+                .end_symbol(Some("\u{25b6}"))
+                .style(base().fg(C_BLUE)),
+            area,
+            &mut bar_state,
+        );
+    } else {
+        f.render_stateful_widget(table, area, &mut table_state);
+    }
     app.hitmap.account_list = Some(super::hitmap::ListHit {
         rows_area: super::hitmap::table_rows_area(area),
         offset: table_state.offset(),
@@ -2629,6 +2681,44 @@ mod tests {
         let none = UsageInfo::default();
         assert_eq!(credits_table_text(&none), "--");
         assert_eq!(credits_table_color(&none), DIM);
+    }
+
+    #[test]
+    fn narrow_account_table_scrolls_sideways_instead_of_squeezing_columns() {
+        let mut app = App::new();
+        app.accounts.push(AccountEntry {
+            alias: "paperengineer05".into(),
+            info: AccountInfo {
+                email: Some("paperengineer05@gmail.com".into()),
+                ..AccountInfo::default()
+            },
+            usage: UsageStatus::Loaded(Box::default()),
+            is_current: true,
+        });
+        app.view_indices.push(0);
+
+        let render = |app: &mut App| {
+            let backend = TestBackend::new(60, 8);
+            let mut terminal = Terminal::new(backend).unwrap();
+            terminal
+                .draw(|frame| render_account_table(frame, app, frame.area()))
+                .unwrap();
+            (0..8)
+                .map(|y| row_text(terminal.backend(), y))
+                .collect::<Vec<_>>()
+                .join("
+")
+        };
+
+        let left = render(&mut app);
+        assert!(left.contains("scroll"), "title must announce the scroll: {left}");
+        assert!(left.contains("paperengineer05"), "alias stays whole: {left}");
+        assert!(!left.contains("Cards"), "far-right column starts off screen: {left}");
+
+        app.col_scroll = u16::MAX; // clamped to the far right
+        let right = render(&mut app);
+        assert!(right.contains("Cards"), "scrolling right reveals the last column: {right}");
+        assert!(!right.contains("paperengineer05"), "left columns scrolled away: {right}");
     }
 
     #[test]

@@ -68,6 +68,12 @@ pub const KEYMAP: &[Binding] = &[
         in_status_bar: true,
     },
     Binding {
+        keys: "← →",
+        section: Section::Account,
+        label: "scroll the table sideways when the window is narrow",
+        in_status_bar: false,
+    },
+    Binding {
         keys: "tab / shift+tab",
         section: Section::Navigation,
         label: "next / previous tab (Accounts / Providers / Settings / Logs)",
