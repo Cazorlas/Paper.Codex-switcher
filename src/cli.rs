@@ -114,7 +114,7 @@ pub enum ProviderCommand {
 #[command(
     name = "paper-codex-switch",
     version = concat!(env!("CARGO_PKG_VERSION"), "\n", env!("CARGO_PKG_REPOSITORY")),
-    about = "Codex account switcher -- multi-profile manager with usage dashboard\nhttps://github.com/xjoker/codex-switch",
+    about = "Codex account switcher -- multi-profile manager with usage dashboard and automatic swap\nhttps://github.com/Cazorlas/Paper.Codex-switcher",
     long_about = None,
     after_help = "Examples:\n  paper-codex-switch list\n  paper-codex-switch use\n  paper-codex-switch rename old-alias new-alias\n  paper-codex-switch import ./auth-backups\n  paper-codex-switch self-update --check\n\nRun `paper-codex-switch <command> --help` for command-specific options."
 )]

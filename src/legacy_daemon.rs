@@ -60,8 +60,7 @@ pub(crate) fn run(args: &[String]) -> i32 {
         Cleanup::Failed(detail) => eprintln!("Could not remove the old daemon service: {detail}"),
     }
     eprintln!(
-        "Obsolete [daemon] settings in config.toml can be deleted. See \
-         https://github.com/xjoker/codex-switch/wiki/Updating#migrate-from-the-removed-daemon"
+        "Obsolete [daemon] settings in config.toml can be deleted."
     );
 
     // Last step: this process may itself be the service job being stopped.
