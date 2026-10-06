@@ -47,8 +47,8 @@ jobs:
           echo "release=$tag npm=$npm_latest codex=$cx"
           if [ -z "$problems" ]; then echo "ALL GOOD"; exit 0; fi
           printf 'Weekly health check found:\n\n%s\nRun: %s/%s/actions/runs/%s\n' "$problems" "$GITHUB_SERVER_URL" "$REPO" "$GITHUB_RUN_ID" > body.md
-          gh label create health --color D93F0B --description "weekly health check" --force >/dev/null
-          existing=$(gh issue list --label health --state open --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then gh issue comment "$existing" --body-file body.md; else gh issue create --title "Weekly health check needs attention" --label health --body-file body.md; fi
+          gh label create -R "$REPO" health --color D93F0B --description "weekly health check" --force >/dev/null
+          existing=$(gh issue list -R "$REPO" --label health --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then gh issue comment -R "$REPO" "$existing" --body-file body.md; else gh issue create -R "$REPO" --title "Weekly health check needs attention" --label health --body-file body.md; fi
           echo "$problems"
           exit 0
