@@ -20,7 +20,7 @@ jobs:
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - shell: bash
         run: cp target/${{ matrix.target }}/release/${{ matrix.bin }} ${{ matrix.asset }}
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: ${{ matrix.asset }}
 
