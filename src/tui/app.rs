@@ -242,8 +242,6 @@ pub struct App {
     /// Active top-level tab.
     pub active_tab: Tab,
     pub selected: usize,
-    /// Horizontal scroll of the accounts table, in cells.
-    pub col_scroll: u16,
     pub search: Option<SearchState>,
     pub search_active: bool,
     pub sort_mode: SortMode,
@@ -341,7 +339,6 @@ impl App {
             settings: super::settings::SettingsState::from_config(cfg.clone()),
             active_tab: Tab::default(),
             selected: 0,
-            col_scroll: 0,
             search: None,
             search_active: false,
             sort_mode: SortMode::Name,
@@ -1093,12 +1090,6 @@ impl App {
             }
             KeyCode::Up | KeyCode::Char('k') if self.selected > 0 => {
                 self.selected -= 1;
-            }
-            KeyCode::Left => {
-                self.col_scroll = self.col_scroll.saturating_sub(10);
-            }
-            KeyCode::Right => {
-                self.col_scroll = self.col_scroll.saturating_add(10);
             }
             KeyCode::Enter => {
                 if self.marked.is_empty() {

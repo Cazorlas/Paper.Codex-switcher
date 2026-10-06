@@ -4,10 +4,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Cell, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState,
-        StatefulWidget, Table, TableState,
-    },
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState},
 };
 
 use super::app::{App, Tab, UsageStatus};
@@ -399,6 +396,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
     let header = Row::new(header_cells).height(1);
 
     let mut rows: Vec<Row> = Vec::new();
+    let mut cards: Vec<Vec<Line<'static>>> = Vec::new();
     let mut render_selected: usize = 0;
     for (view_i, &acc_i) in app.view_indices.iter().enumerate() {
         let entry = &app.accounts[acc_i];
@@ -593,6 +591,42 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
                 UsageStatus::Loaded(u) => (credits_table_text(u), credits_table_color(u)),
             };
 
+            let (card_until, card_until_level) =
+                crate::jwt::subscription_label(entry.info.subscription_until, now);
+            let dim = base().fg(DIM);
+            cards.push(vec![
+                Line::from(vec![
+                    Span::styled(format!("{marker} "), marker_style),
+                    Span::styled(format!("{}. {}", view_i + 1, entry.alias), row_style),
+                    Span::raw("  "),
+                    Span::styled(format!("[{plan_label}]"), plan_style),
+                ]),
+                Line::from(Span::styled(format!("  {email}"), dim)),
+                Line::from(vec![
+                    Span::styled("  5h ", dim),
+                    Span::styled(format!("{pct_5h} left"), usage_pct_style(&pct_5h, is_selected)),
+                    Span::styled(format!("  resets {reset_5h}"), base().fg(reset_5h_color)),
+                ]),
+                Line::from(vec![
+                    Span::styled("  7d ", dim),
+                    Span::styled(format!("{pct_7d} left"), usage_pct_style(&pct_7d, is_selected)),
+                    Span::styled(format!("  resets {reset_7d}"), base().fg(reset_7d_color)),
+                ]),
+                Line::from(vec![
+                    Span::styled(format!("  {status_text}"), base().fg(status_color)),
+                    Span::styled(
+                        format!("  until {card_until}"),
+                        base().fg(if card_until_level == crate::jwt::ExpiryLevel::Soon {
+                            C_YELLOW
+                        } else {
+                            DIM
+                        }),
+                    ),
+                    Span::styled(format!("  cards {reset_cards}"), base().fg(reset_cards_color)),
+                ]),
+                Line::from(""),
+            ]);
+
             let mut cells = vec![
                 Cell::from(Span::styled(marker, marker_style)),
                 Cell::from(entry.alias.clone()).style(row_style),
@@ -684,10 +718,8 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         })
         .collect();
     let plans: Vec<&str> = plan_labels.iter().map(String::as_str).collect();
-    // Natural widths: when the window is too narrow the table scrolls sideways
-    // (Left/Right) instead of squeezing every column to a few characters.
     let text_widths = table_text_widths(
-        4000,
+        area.width,
         &aliases,
         &emails,
         &plans,
@@ -725,15 +757,27 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         .sum::<u16>()
         .saturating_add(constraints.len().saturating_sub(1) as u16)
         .saturating_add(2);
-    let overflow = natural > area.width;
-    let max_scroll = natural.saturating_sub(area.width);
-    app.col_scroll = app.col_scroll.min(max_scroll);
-    let col_scroll = app.col_scroll;
-    let title = if overflow {
-        format!("{}\u{2190}\u{2192} scroll ", title)
-    } else {
-        title
-    };
+    if natural > area.width {
+        // Too narrow for the table: one block per account, stacked, like `list`.
+        let block = Block::default()
+            .title(title)
+            .borders(Borders::ALL)
+            .border_style(base().fg(C_BLUE))
+            .style(base());
+        let inner = block.inner(area);
+        f.render_widget(block, area);
+        let per_card = cards.first().map_or(6, Vec::len);
+        let visible = usize::from(inner.height) / per_card.max(1);
+        let first = if visible > 0 && render_selected >= visible {
+            render_selected + 1 - visible
+        } else {
+            0
+        };
+        let lines: Vec<Line<'static>> = cards.into_iter().skip(first).flatten().collect();
+        f.render_widget(Paragraph::new(lines).style(base()), inner);
+        app.hitmap.account_list = None;
+        return;
+    }
 
     let table = Table::new(rows, constraints)
         .header(header)
@@ -747,35 +791,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
         .row_highlight_style(highlight())
         .style(base());
 
-    if overflow {
-        // Draw the whole table off screen, then show a window of it.
-        let virtual_area = Rect::new(0, 0, natural, area.height);
-        let mut buf = ratatui::buffer::Buffer::empty(virtual_area);
-        table.render(virtual_area, &mut buf, &mut table_state);
-        let frame_buf = f.buffer_mut();
-        for dy in 0..area.height {
-            for dx in 0..area.width {
-                if let Some(src) = buf.cell((col_scroll + dx, dy)) {
-                    if let Some(dst) = frame_buf.cell_mut((area.x + dx, area.y + dy)) {
-                        *dst = src.clone();
-                    }
-                }
-            }
-        }
-        let mut bar_state = ScrollbarState::new(usize::from(max_scroll) + usize::from(area.width))
-            .viewport_content_length(usize::from(area.width))
-            .position(usize::from(col_scroll));
-        f.render_stateful_widget(
-            Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
-                .begin_symbol(Some("\u{25c0}"))
-                .end_symbol(Some("\u{25b6}"))
-                .style(base().fg(C_BLUE)),
-            area,
-            &mut bar_state,
-        );
-    } else {
-        f.render_stateful_widget(table, area, &mut table_state);
-    }
+    f.render_stateful_widget(table, area, &mut table_state);
     app.hitmap.account_list = Some(super::hitmap::ListHit {
         rows_area: super::hitmap::table_rows_area(area),
         offset: table_state.offset(),
@@ -2684,41 +2700,42 @@ mod tests {
     }
 
     #[test]
-    fn narrow_account_table_scrolls_sideways_instead_of_squeezing_columns() {
+    fn narrow_window_stacks_one_block_per_account() {
         let mut app = App::new();
-        app.accounts.push(AccountEntry {
-            alias: "paperengineer05".into(),
-            info: AccountInfo {
-                email: Some("paperengineer05@gmail.com".into()),
-                ..AccountInfo::default()
-            },
-            usage: UsageStatus::Loaded(Box::default()),
-            is_current: true,
-        });
-        app.view_indices.push(0);
+        for alias in ["paperengineer05", "paperengineer07"] {
+            app.accounts.push(AccountEntry {
+                alias: alias.into(),
+                info: AccountInfo {
+                    email: Some(format!("{alias}@gmail.com")),
+                    ..AccountInfo::default()
+                },
+                usage: UsageStatus::Loaded(Box::default()),
+                is_current: alias.ends_with('5'),
+            });
+            app.view_indices.push(app.view_indices.len());
+        }
 
-        let render = |app: &mut App| {
-            let backend = TestBackend::new(60, 8);
+        let render = |app: &mut App, width: u16| {
+            let backend = TestBackend::new(width, 16);
             let mut terminal = Terminal::new(backend).unwrap();
             terminal
                 .draw(|frame| render_account_table(frame, app, frame.area()))
                 .unwrap();
-            (0..8)
+            (0..16)
                 .map(|y| row_text(terminal.backend(), y))
                 .collect::<Vec<_>>()
                 .join("
 ")
         };
 
-        let left = render(&mut app);
-        assert!(left.contains("scroll"), "title must announce the scroll: {left}");
-        assert!(left.contains("paperengineer05"), "alias stays whole: {left}");
-        assert!(!left.contains("Cards"), "far-right column starts off screen: {left}");
+        let narrow = render(&mut app, 50);
+        assert!(narrow.contains("1. paperengineer05"), "{narrow}");
+        assert!(narrow.contains("paperengineer07@gmail.com"), "{narrow}");
+        assert!(narrow.contains("5h ") && narrow.contains("7d "), "{narrow}");
+        assert!(!narrow.contains("Alias"), "no table header when stacked: {narrow}");
 
-        app.col_scroll = u16::MAX; // clamped to the far right
-        let right = render(&mut app);
-        assert!(right.contains("Cards"), "scrolling right reveals the last column: {right}");
-        assert!(!right.contains("paperengineer05"), "left columns scrolled away: {right}");
+        let wide = render(&mut app, 160);
+        assert!(wide.contains("Alias") && wide.contains("Email"), "{wide}");
     }
 
     #[test]

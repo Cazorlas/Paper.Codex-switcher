@@ -65,7 +65,7 @@ paper-codex-switch use            # switch to the best account
 paper-codex-switch use 2          # switch to account number 2 in `list`
 paper-codex-switch use work       # ...or by alias
 paper-codex-switch launch         # start Codex on the best account
-paper-codex-switch tui            # interactive dashboard (← → scroll the table sideways in a narrow window, h for help)
+paper-codex-switch tui            # interactive dashboard (in a narrow window each account becomes a stacked block)
 paper-codex-switch auto           # switch automatically near the limit (see below)
 ```
 
