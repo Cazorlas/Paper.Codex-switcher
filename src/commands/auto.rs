@@ -40,10 +40,12 @@ pub(crate) enum Decision {
     Blocked { pressure: f64 },
 }
 
-/// The busier of the two quota windows, as a used percent.
+/// The busier of the two quota windows, as a used percent. A window whose reset
+/// time has already passed counts as empty (`effective_used_*`), so an old reading
+/// cannot make an account look busy after its quota came back.
 pub(crate) fn pressure(c: &usage::Candidate) -> f64 {
-    let five = if c.has_5h_data { c.used_5h } else { 0.0 };
-    let seven = if c.has_7d_data { c.used_7d } else { 0.0 };
+    let five = if c.has_5h_data { c.effective_used_5h() } else { 0.0 };
+    let seven = if c.has_7d_data { c.effective_used_7d() } else { 0.0 };
     five.max(seven)
 }
 
@@ -396,6 +398,37 @@ mod tests {
             pool_exhausted: 0,
             team_priority: false,
         }
+    }
+
+    #[test]
+    fn a_window_that_already_reset_does_not_count_as_busy() {
+        // Reading says 97% used, but that window reset 10 minutes ago (now = 1000).
+        let mut stale = cand("a", 97.0, 20.0);
+        stale.now = 1_000;
+        stale.resets_at_5h = Some(400);
+        assert_eq!(pressure(&stale), 20.0);
+
+        // Same reading with the reset still ahead is busy.
+        stale.resets_at_5h = Some(1_600);
+        assert_eq!(pressure(&stale), 97.0);
+
+        // The weekly window follows the same rule.
+        let mut week = cand("b", 5.0, 95.0);
+        week.now = 1_000;
+        week.resets_at_7d = Some(999);
+        assert_eq!(pressure(&week), 5.0);
+    }
+
+    #[test]
+    fn auto_stays_when_the_busy_window_has_already_reset() {
+        let mut a = cand("a", 97.0, 10.0);
+        a.now = 1_000;
+        a.resets_at_5h = Some(900);
+        let r = vec![(a, 1.0), (cand("b", 0.0, 0.0), 2.0)];
+        assert!(matches!(
+            decide("a", &r, false, &opts(), 20.0),
+            Decision::Stay { .. }
+        ));
     }
 
     #[test]
