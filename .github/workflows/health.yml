@@ -13,7 +13,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
-      VERIFIED_CODEX_MINOR: "160"
+      VERIFIED_CODEX_MINOR: "161"
     steps:
       - name: Run checks
         run: |
