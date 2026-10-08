@@ -22,6 +22,8 @@ pub(crate) struct AutoOptions {
     pub once: bool,
     pub dry_run: bool,
     pub json: bool,
+    /// Also show a Windows toast notification (the terminal bell is always sent).
+    pub toast: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +87,37 @@ pub(crate) fn decide(
             pressure: cur_pressure,
         },
     }
+}
+
+/// Tell the person who minimized the window that something happened: the terminal
+/// bell flashes the taskbar entry, and `--toast` adds a Windows notification.
+fn notify(opts: &AutoOptions, title: &str, body: &str) {
+    if opts.json || opts.once || opts.dry_run {
+        return;
+    }
+    print!("\x07");
+    #[cfg(windows)]
+    if opts.toast {
+        // Text goes through the environment, never into the script, so account names
+        // cannot be interpreted as PowerShell.
+        let script = "$ErrorActionPreference='Stop';\
+[void][Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime];\
+$x=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);\
+$t=$x.GetElementsByTagName('text');\
+[void]$t.Item(0).AppendChild($x.CreateTextNode($env:PCS_TOAST_TITLE));\
+[void]$t.Item(1).AppendChild($x.CreateTextNode($env:PCS_TOAST_BODY));\
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('paper-codex-switch').Show([Windows.UI.Notifications.ToastNotification]::new($x))";
+        let _ = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("PCS_TOAST_TITLE", title)
+            .env("PCS_TOAST_BODY", body)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+    #[cfg(not(windows))]
+    let _ = (title, body);
 }
 
 fn emit(opts: &AutoOptions, event: &str, detail: serde_json::Value, text: String) {
@@ -246,6 +279,13 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                         )),
                     );
                 }
+                if !last_blocked {
+                    notify(
+                        &opts,
+                        "paper-codex-switch: no account left",
+                        &format!("'{current}' is at {pressure:.0}% and every other account is over the limit"),
+                    );
+                }
                 last_blocked = true;
                 Some(EXIT_BLOCKED)
             }
@@ -281,6 +321,11 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                     Some(EXIT_NOTHING_TO_DO)
                 } else if apply(&current, &alias)? {
                     last_switch = Some(Instant::now());
+                    notify(
+                        &opts,
+                        "paper-codex-switch: switched account",
+                        &format!("{current} ({from_pressure:.0}%) -> {alias} ({to_pressure:.0}%)"),
+                    );
                     emit(
                         &opts,
                         "switched",
@@ -330,6 +375,7 @@ mod tests {
             once: true,
             dry_run: false,
             json: false,
+            toast: false,
         }
     }
 

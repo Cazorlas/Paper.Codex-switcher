@@ -7,6 +7,7 @@ mod login;
 mod misc;
 pub(crate) mod profile;
 mod provider;
+mod status;
 mod render;
 mod update;
 
@@ -18,5 +19,6 @@ pub(crate) use login::login_cmd;
 pub(crate) use misc::{format_resync_confirm_prompt, open_cmd, reset_card_cmd, warmup_cmd};
 pub(crate) use profile::{restore_cmd, delete_cmd, list_cmd, rename_cmd, use_cmd};
 pub(crate) use provider::provider_cmd;
+pub(crate) use status::status_cmd;
 pub(crate) use render::confirm;
 pub(crate) use update::self_update_cmd;

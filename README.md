@@ -1,5 +1,7 @@
 # paper-codex-switch
 
+**English** · [Tiếng Việt](README.vi.md)
+
 **Multi-account switcher for [OpenAI Codex CLI](https://github.com/openai/codex), with automatic swap before you hit a usage limit.**
 
 Save several Codex logins, see every account's 5-hour and weekly quota in one dashboard, switch with one command, and let `auto` move you to a fresh account before the active one runs dry.
@@ -14,6 +16,7 @@ Save several Codex logins, see every account's 5-hour and weekly quota in one da
 - Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, shown as the percent **used** (it goes up as you work; green below 70%, yellow from 70%, red from 90%), plan, reset cards, and the date each plan runs until (`Plan until`, yellow in the last 7 days).
 - **`auto`**: loop that switches accounts when the active one nears its limit (leave the window open, minimized).
 - **`launch --auto-swap`**: run Codex and, at the threshold, restart the session on a better account with `codex resume --last`.
+- **`status --short`**: one line for a shell prompt or status line, e.g. `paperengineer05 5h 22% 7d 47%`.
 - Custom Responses-compatible API providers (beta), proxies, JSON output.
 - Windows, macOS and Linux.
 
@@ -65,6 +68,7 @@ paper-codex-switch use            # switch to the best account
 paper-codex-switch use 2          # switch to account number 2 in `list`
 paper-codex-switch use work       # ...or by alias
 paper-codex-switch launch         # start Codex on the best account
+paper-codex-switch status --short  # one line for a status line / prompt
 paper-codex-switch tui            # interactive dashboard (in a narrow window each account becomes a stacked block)
 paper-codex-switch auto           # switch automatically near the limit (see below)
 ```
@@ -125,6 +129,7 @@ The `.exe` is not code-signed yet, and Microsoft Defender's machine-learning det
 paper-codex-switch auto                    # foreground loop, checks every 60s
 paper-codex-switch auto --threshold 80     # switch earlier (default 90)
 paper-codex-switch auto --dry-run          # log what it would do, never switch
+paper-codex-switch auto --toast            # also show a Windows notification on a switch or when no account is left
 paper-codex-switch --json auto --once      # one check, for cron / Task Scheduler
 ```
 
@@ -136,6 +141,7 @@ paper-codex-switch --json auto --once      # one check, for cron / Task Schedule
 | `--cooldown` | 300 | minimum seconds between two switches |
 | `--once` | off | single check, then exit |
 | `--dry-run` | off | report only |
+| `--toast` | off | add a Windows notification (the terminal bell is always sent) |
 
 How it decides:
 
@@ -143,6 +149,7 @@ How it decides:
 2. At or above the threshold it refreshes all accounts, ranks them with the same scoring as `use`, and picks the best eligible one that is under the threshold and `--margin` points lower.
 3. The switch is a compare-and-swap on the active marker, so it never overwrites a change made by another process. A running Codex app-server daemon is restarted afterwards, like after `use`.
 4. If every account is exhausted it backs off to a 10-minute cadence. Usage-check errors keep the current account and retry.
+5. On a switch, or when no account is left, it rings the terminal bell (which flashes a minimized window in the taskbar); add `--toast` for a Windows notification.
 
 `--once` exit codes: `0` switched, `1` error, `2` nothing to do, `3` blocked (no viable target). With `--json` each event is one JSON line.
 

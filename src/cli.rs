@@ -197,6 +197,10 @@ Examples:
         /// Report what would happen without switching
         #[arg(long)]
         dry_run: bool,
+        /// Also show a Windows notification when it switches or runs out of accounts
+        /// (the terminal bell, which flashes a minimized window, is always sent)
+        #[arg(long)]
+        toast: bool,
     },
     /// List all profiles with account info, usage, and availability
     List {
@@ -320,6 +324,18 @@ Examples:
         /// Codex argv; prefer `--` before this so flags are not parsed by paper-codex-switch
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
+    },
+    /// One-line status of the active account (for a shell prompt or status line)
+    #[command(
+        after_help = "Uses the cached usage unless it is missing or --force is given, so it is fast enough for a prompt.\n\nExamples:\n  paper-codex-switch status --short      ->  paperengineer05 5h 22% 7d 47%\n  paper-codex-switch --json status"
+    )]
+    Status {
+        /// Single line: alias, then used percent of the 5h and 7d windows
+        #[arg(long)]
+        short: bool,
+        /// Refresh usage from the server first
+        #[arg(long, short)]
+        force: bool,
     },
     /// Launch the interactive TUI
     Tui,

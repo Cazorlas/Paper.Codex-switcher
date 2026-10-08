@@ -171,6 +171,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Launch { .. } => "launch",
         Commands::Tui => "tui",
         Commands::Open => "open",
+        Commands::Status { .. } => "status",
         Commands::Provider(_) => "provider",
         Commands::Daemon { .. } => "daemon",
     }
@@ -217,6 +218,7 @@ async fn dispatch(
             cooldown,
             once,
             dry_run,
+            toast,
         } => {
             let opts = commands::AutoOptions {
                 threshold,
@@ -226,6 +228,7 @@ async fn dispatch(
                 once,
                 dry_run,
                 json,
+                toast,
             };
             commands::auto_cmd(opts).await?
         }
@@ -267,6 +270,7 @@ async fn dispatch(
                 once: false,
                 dry_run: false,
                 json: false,
+                toast: false,
             });
             commands::launch_cmd(
                 alias.as_deref(),
@@ -280,6 +284,7 @@ async fn dispatch(
         }
         Commands::Tui => tui::run_tui().await?,
         Commands::Open => commands::open_cmd()?,
+        Commands::Status { short, force } => commands::status_cmd(short, force, json).await?,
         Commands::Provider(sub) => commands::provider_cmd(sub, json).await?,
         Commands::Daemon { .. } => unreachable!("the daemon shim exits before dispatch"),
     }

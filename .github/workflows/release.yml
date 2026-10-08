@@ -43,7 +43,7 @@ jobs:
           [ "$tag" = "$cargo_version" ] || { echo "tag $tag != Cargo.toml $cargo_version"; exit 1; }
           cd npm && npm version "$tag" --no-git-tag-version --allow-same-version
       - name: Package files
-        run: cp README.md LICENSE THIRD_PARTY_NOTICES.md npm/
+        run: cp README.md README.vi.md LICENSE THIRD_PARTY_NOTICES.md npm/
       - name: Point README image at GitHub
         run: sed -i 's|(docs/list.png)|(https://raw.githubusercontent.com/Cazorlas/Paper.Codex-switcher/main/docs/list.png)|' npm/README.md
       - run: npm publish --access public
