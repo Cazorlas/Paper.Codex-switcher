@@ -758,7 +758,32 @@ struct CodexPipes {
     stderr: Option<std::thread::JoinHandle<CapturedBytes>>,
 }
 
+/// Kill the descendants of `pid`. `codex` is usually a wrapper (npm's `node` shim or
+/// `cmd`) around the real binary, so killing only the direct child leaves the
+/// session, and any command it is running, alive on the old account.
+fn kill_process_tree(pid: u32) {
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/T", "/F", "/PID", &pid.to_string()])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+    #[cfg(unix)]
+    {
+        let _ = std::process::Command::new("pkill")
+            .args(["-TERM", "-P", &pid.to_string()])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+}
+
 fn terminate_child(child: &mut std::process::Child, pipes: CodexPipes) {
+    kill_process_tree(child.id());
     let _ = child.kill();
     let _ = child.wait();
     let _ = join_codex_pipes(pipes);
@@ -1829,6 +1854,53 @@ mod tests {
             rewrite_provider_resume_args(&prompt_flag, 0, "exact-session"),
             ["resume", "exact-session", "--", "--last", "prompt"]
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn terminating_a_launch_also_ends_what_the_wrapper_started() {
+        // A wrapper (like npm's `node` shim for codex) that runs the real work as a
+        // child: killing only the wrapper would leave the child running.
+        let marker = format!("pcs-kill-test-{}", std::process::id());
+        let mut wrapper = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "$host.ui.RawUI.WindowTitle='{marker}'; Start-Process -NoNewWindow -Wait powershell -ArgumentList '-NoProfile','-Command','Start-Sleep 60 # {marker}'"
+                ),
+            ])
+            .spawn()
+            .expect("spawn wrapper");
+        let alive = |needle: &str| {
+            let out = std::process::Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    &format!(
+                        "(Get-CimInstance Win32_Process | Where-Object {{ $_.CommandLine -like '*Start-Sleep 60 # {needle}*' -and $_.ProcessId -ne $PID }} | Measure-Object).Count"
+                    ),
+                ])
+                .output()
+                .expect("query processes");
+            String::from_utf8_lossy(&out.stdout).trim().parse::<u32>().unwrap_or(0)
+        };
+        let mut waited = 0;
+        while alive(&marker) == 0 && waited < 40 {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            waited += 1;
+        }
+        assert!(alive(&marker) >= 1, "the wrapper's child must be running first");
+
+        super::terminate_child(
+            &mut wrapper,
+            super::CodexPipes {
+                stdout: None,
+                stderr: None,
+            },
+        );
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        assert_eq!(alive(&marker), 0, "the wrapper's child must be ended too");
     }
 
     #[cfg(unix)]
