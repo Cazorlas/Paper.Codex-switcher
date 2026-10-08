@@ -11,7 +11,7 @@ Save several Codex logins, see every account's 5-hour and weekly quota in one da
 ## Features
 
 - Save, import, rename and recoverably delete Codex profiles; switch by name, by number, or to the best account automatically.
-- Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, plan, reset cards, and the date each plan runs until (`Plan until`, yellow in the last 7 days).
+- Usage dashboard (CLI `list` and interactive `tui`) for the 5h and 7d windows, shown as the percent **used** (it goes up as you work; green below 70%, yellow from 70%, red from 90%), plan, reset cards, and the date each plan runs until (`Plan until`, yellow in the last 7 days).
 - **`auto`**: loop that switches accounts when the active one nears its limit (leave the window open, minimized).
 - **`launch --auto-swap`**: run Codex and, at the threshold, restart the session on a better account with `codex resume --last`.
 - Custom Responses-compatible API providers (beta), proxies, JSON output.

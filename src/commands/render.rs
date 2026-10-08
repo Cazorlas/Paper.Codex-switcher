@@ -90,18 +90,17 @@ pub(crate) fn format_reset_short_relative(w: &usage::WindowUsage) -> String {
 }
 
 /// Render one additional-limit pool's window as a compact segment, e.g.
-/// "5h [====------] 60% left". Reuses the same bar/color helpers as the
+/// "5h [====------] 40% used". Reuses the same bar/color helpers as the
 /// primary account's usage line.
 fn pool_window_segment(label: &str, w: &usage::WindowUsage, window_secs: i64) -> String {
     let pct = w.used_percent.unwrap_or(0.0);
-    let remaining_pct = (100.0 - pct).max(0.0);
     let pace = usage::visible_pace_percent(w, window_secs);
     let bar = render_progress_bar(pct, pace, 10);
     format!(
         "{} [{}] {}",
         color::dim(label),
         color::usage_pct(&bar, pct),
-        color::usage_pct(&format!("{remaining_pct:.0}% left"), pct),
+        color::usage_pct(&format!("{pct:.0}% used"), pct),
     )
 }
 
@@ -129,7 +128,7 @@ pub(crate) fn print_additional_pool_lines(limits: &[usage::AdditionalRateLimit])
 
 pub(crate) fn print_usage_line(u: &usage::UsageInfo) {
     let width = term_width();
-    // Each line: "  5h  bar  XXX% left  ~Xh" ≈ bar_width + 30
+    // Each line: "  5h  bar  XXX% used  ~Xh" ≈ bar_width + 30
     let bar_width = if width >= 80 {
         16
     } else if width >= 60 {
@@ -140,8 +139,7 @@ pub(crate) fn print_usage_line(u: &usage::UsageInfo) {
 
     if let Some(w) = &u.primary {
         let pct = w.used_percent.unwrap_or(0.0);
-        let remaining_pct = (100.0 - pct).max(0.0);
-        let pace = usage::visible_pace_percent(w, usage::WINDOW_5H_SECS);
+            let pace = usage::visible_pace_percent(w, usage::WINDOW_5H_SECS);
         let over = pct >= 10.0 && pace.is_some_and(|p| pct > p);
         let bar = render_progress_bar(pct, pace, bar_width);
         let reset = format_reset_short_relative(w);
@@ -153,15 +151,14 @@ pub(crate) fn print_usage_line(u: &usage::UsageInfo) {
         println!(
             "  5h  {}  {}{}   {}",
             color::usage_pct(&bar, pct),
-            color::usage_pct(&format!("{remaining_pct:>3.0}% left"), pct),
+            color::usage_pct(&format!("{pct:>3.0}% used"), pct),
             warn,
             color::dim(&reset),
         );
     }
     if let Some(w) = &u.secondary {
         let pct = w.used_percent.unwrap_or(0.0);
-        let remaining_pct = (100.0 - pct).max(0.0);
-        let pace = usage::visible_pace_percent(w, usage::WINDOW_7D_SECS);
+            let pace = usage::visible_pace_percent(w, usage::WINDOW_7D_SECS);
         let over = pct >= 10.0 && pace.is_some_and(|p| pct > p);
         let bar = render_progress_bar(pct, pace, bar_width);
         let reset = format_reset_short_relative(w);
@@ -173,7 +170,7 @@ pub(crate) fn print_usage_line(u: &usage::UsageInfo) {
         println!(
             "  7d  {}  {}{}   {}",
             color::usage_pct(&bar, pct),
-            color::usage_pct(&format!("{remaining_pct:>3.0}% left"), pct),
+            color::usage_pct(&format!("{pct:>3.0}% used"), pct),
             warn,
             color::dim(&reset),
         );

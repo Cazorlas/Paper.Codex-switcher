@@ -516,7 +516,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
                         .as_ref()
                         .and_then(|w| w.used_percent)
                         .map(|p| {
-                            let s = format!("{:.0}%", (100.0 - p).max(0.0));
+                            let s = format!("{:.0}%", p.clamp(0.0, 100.0));
                             if over_5h { format!("{s}!") } else { s }
                         })
                         .unwrap_or_else(|| "--".into());
@@ -525,7 +525,7 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
                         .as_ref()
                         .and_then(|w| w.used_percent)
                         .map(|p| {
-                            let s = format!("{:.0}%", (100.0 - p).max(0.0));
+                            let s = format!("{:.0}%", p.clamp(0.0, 100.0));
                             if over_7d { format!("{s}!") } else { s }
                         })
                         .unwrap_or_else(|| "--".into());
@@ -604,12 +604,12 @@ fn render_account_table(f: &mut Frame, app: &mut App, area: Rect) {
                 Line::from(Span::styled(format!("  {email}"), dim)),
                 Line::from(vec![
                     Span::styled("  5h ", dim),
-                    Span::styled(format!("{pct_5h} left"), usage_pct_style(&pct_5h, is_selected)),
+                    Span::styled(format!("{pct_5h} used"), usage_pct_style(&pct_5h, is_selected)),
                     Span::styled(format!("  resets {reset_5h}"), base().fg(reset_5h_color)),
                 ]),
                 Line::from(vec![
                     Span::styled("  7d ", dim),
-                    Span::styled(format!("{pct_7d} left"), usage_pct_style(&pct_7d, is_selected)),
+                    Span::styled(format!("{pct_7d} used"), usage_pct_style(&pct_7d, is_selected)),
                     Span::styled(format!("  resets {reset_7d}"), base().fg(reset_7d_color)),
                 ]),
                 Line::from(vec![
@@ -1968,14 +1968,15 @@ fn reset_color(remaining_secs: i64) -> Color {
     }
 }
 
-fn usage_pct_style(remaining_pct_str: &str, is_selected: bool) -> Style {
-    let over_pace = remaining_pct_str.ends_with('!');
-    let clean = remaining_pct_str.trim_end_matches('!');
+fn usage_pct_style(used_pct_str: &str, is_selected: bool) -> Style {
+    let over_pace = used_pct_str.ends_with('!');
+    let clean = used_pct_str.trim_end_matches('!');
     let fg = if over_pace {
         C_RED
     } else {
         match clean.trim_end_matches('%').parse::<f64>() {
-            Ok(n) => remaining_color(n),
+            // remaining_color works on what is left, the cell now shows what is used
+            Ok(used) => remaining_color(100.0 - used),
             Err(_) => DIM,
         }
     };
@@ -2697,6 +2698,14 @@ mod tests {
         let none = UsageInfo::default();
         assert_eq!(credits_table_text(&none), "--");
         assert_eq!(credits_table_color(&none), DIM);
+    }
+
+    #[test]
+    fn usage_cells_show_what_is_used_and_color_by_how_full_it_is() {
+        assert_eq!(super::usage_pct_style("20%", false).fg, Some(C_GREEN));
+        assert_eq!(super::usage_pct_style("75%", false).fg, Some(C_YELLOW));
+        assert_eq!(super::usage_pct_style("95%", false).fg, Some(C_RED));
+        assert_eq!(super::usage_pct_style("10%!", false).fg, Some(C_RED), "over pace is always red");
     }
 
     #[test]
