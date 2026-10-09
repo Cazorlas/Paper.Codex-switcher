@@ -212,6 +212,7 @@ async fn dispatch(
             consume_card,
         } => commands::use_cmd(alias.as_deref(), json, consume_card).await?,
         Commands::Auto {
+            prefer_expiring,
             threshold,
             margin,
             interval,
@@ -221,6 +222,7 @@ async fn dispatch(
             toast,
         } => {
             let opts = commands::AutoOptions {
+                prefer_expiring_days: prefer_expiring,
                 threshold,
                 margin,
                 interval: std::time::Duration::from_secs(interval.max(5)),
@@ -263,6 +265,7 @@ async fn dispatch(
         } => {
             let args = merge_launch_args(args, launch_passthrough);
             let auto_swap = auto_swap.then(|| commands::AutoOptions {
+                prefer_expiring_days: None,
                 threshold: swap_threshold,
                 margin: 10.0,
                 interval: std::time::Duration::from_secs(60),

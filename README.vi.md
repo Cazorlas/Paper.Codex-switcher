@@ -127,6 +127,7 @@ Tệp `.exe` trên Windows chưa được ký số, nên Defender đôi khi báo
 ```bash
 paper-codex-switch auto                        # vòng lặp ở cửa sổ này, kiểm tra mỗi 60 giây
 paper-codex-switch auto --threshold 95         # đổi muộn hơn (mặc định 90)
+paper-codex-switch auto --threshold 95 --prefer-expiring # dùng tài khoản có gói sắp hết hạn trước
 paper-codex-switch auto --dry-run              # chỉ báo sẽ làm gì, không đổi thật
 paper-codex-switch auto --toast                # thêm thông báo Windows khi đổi hoặc hết tài khoản
 paper-codex-switch --json auto --once          # kiểm tra một lần, cho cron / Task Scheduler
@@ -136,6 +137,7 @@ paper-codex-switch --json auto --once          # kiểm tra một lần, cho cro
 |---|---|---|
 | `--threshold` | 90 | đổi khi cửa sổ 5h hoặc 7d dùng tới mức này (%) |
 | `--margin` | 10 | tài khoản đích phải thấp hơn tài khoản hiện tại ít nhất ngần này điểm |
+| `--prefer-expiring [DAYS]` | tắt; 7 khi không ghi DAYS | ưu tiên tài khoản đủ điều kiện có gói hết hạn sớm nhất trong DAYS ngày, kể cả dưới ngưỡng; khi dưới ngưỡng, gói đích phải hết hạn trước gói hiện tại và mức dùng không quá ngưỡng trừ margin |
 | `--interval` | 60 | số giây giữa hai lần kiểm tra |
 | `--cooldown` | 300 | số giây tối thiểu giữa hai lần đổi |
 | `--once` | tắt | kiểm tra một lần rồi thoát |
@@ -144,7 +146,7 @@ paper-codex-switch --json auto --once          # kiểm tra một lần, cho cro
 
 Cách nó quyết định:
 
-1. Mỗi `--interval` nó chỉ kiểm tra tài khoản đang dùng. Dưới ngưỡng thì không làm gì thêm (không gọi mạng cho các tài khoản khác).
+1. Mỗi `--interval` nó chỉ kiểm tra tài khoản đang dùng. Dưới ngưỡng thì không làm gì thêm (không gọi mạng cho các tài khoản khác), trừ khi `--prefer-expiring` tìm thấy gói hết hạn sớm hơn trong các tệp tài khoản cục bộ.
 2. Từ ngưỡng trở lên, nó làm mới tất cả tài khoản, xếp hạng bằng cùng thuật toán chấm điểm của `use`, và chọn tài khoản tốt nhất đủ điều kiện, dưới ngưỡng và thấp hơn `--margin` điểm.
 3. Việc đổi có kiểm tra tài khoản đang dùng chưa bị tiến trình khác đổi, nên không ghi đè thay đổi của nơi khác. Daemon app-server của Codex đang chạy sẽ được khởi động lại sau đó, giống sau `use`.
 4. Nếu mọi tài khoản đều cạn, nó giãn nhịp kiểm tra còn 10 phút một lần. Lỗi khi kiểm tra hạn mức thì giữ tài khoản hiện tại và thử lại.

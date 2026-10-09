@@ -169,6 +169,8 @@ pub enum Commands {
     #[command(
         after_help = "Polls the active account's 5h and 7d windows. When either reaches --threshold, switches to the eligible account with the most headroom (never to one that is itself over the threshold or within --margin points of the current one). A cooldown stops flip-flopping; when every account is exhausted it backs off to a slow cadence.
 
+--prefer-expiring [DAYS] uses the eligible account whose plan ends soonest within DAYS (default 7), even below the threshold if its plan ends before the current account's.
+
 `auto` runs in this window: leave it open (you can minimize it); stop it with Ctrl+C or by closing the window.
 
 --once does a single check for cron: exit 0 switched, 1 error, 2 nothing to do, 3 blocked (no viable target).
@@ -176,9 +178,13 @@ pub enum Commands {
 Examples:
   paper-codex-switch auto
   paper-codex-switch auto --threshold 80 --dry-run
+  paper-codex-switch auto --threshold 95 --prefer-expiring
   paper-codex-switch --json auto --once"
     )]
     Auto {
+        /// Use up an account whose plan ends within DAYS (default 7) before it lapses, even under the threshold
+        #[arg(long, value_name = "DAYS", num_args = 0..=1, default_missing_value = "7")]
+        prefer_expiring: Option<u32>,
         /// Switch when the 5h or 7d window reaches this used percent
         #[arg(long, default_value_t = 90.0)]
         threshold: f64,

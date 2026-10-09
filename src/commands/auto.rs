@@ -4,6 +4,7 @@
 use super::profile::{report_daemon_restart, score_profile_candidates};
 use crate::{app_server, auth, cache, color, config, profile, usage};
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 /// Exit codes for `auto --once`, so cron and scripts can branch on the result.
@@ -24,17 +25,30 @@ pub(crate) struct AutoOptions {
     pub json: bool,
     /// Also show a Windows toast notification (the terminal bell is always sent).
     pub toast: bool,
+    /// Prefer usable quota on a plan ending within this many days.
+    pub prefer_expiring_days: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SwitchReason {
+    Threshold,
+    PlanEnding,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Decision {
     /// Active account is under the threshold.
-    Stay { pressure: f64 },
+    Stay {
+        pressure: f64,
+        used_5h: f64,
+        used_7d: f64,
+    },
     /// Switch to `alias`.
     Switch {
         alias: String,
         from_pressure: f64,
         to_pressure: f64,
+        reason: SwitchReason,
     },
     /// Active account is over the threshold and no account is a viable target.
     Blocked { pressure: f64 },
@@ -58,11 +72,11 @@ pub(crate) fn decide(
     opts: &AutoOptions,
     safety_7d: f64,
 ) -> Decision {
-    let cur_pressure = ranked
+    let current_candidate = ranked
         .iter()
         .find(|(c, _)| c.alias == current)
-        .map(|(c, _)| pressure(c))
-        .unwrap_or(0.0);
+        .map(|(c, _)| c);
+    let cur_pressure = current_candidate.map(pressure).unwrap_or(0.0);
     let cur_pressure = if limited_now {
         cur_pressure.max(100.0)
     } else {
@@ -71,6 +85,12 @@ pub(crate) fn decide(
     if cur_pressure < opts.threshold {
         return Decision::Stay {
             pressure: cur_pressure,
+            used_5h: current_candidate
+                .filter(|c| c.has_5h_data)
+                .map_or(0.0, |c| c.effective_used_5h()),
+            used_7d: current_candidate
+                .filter(|c| c.has_7d_data)
+                .map_or(0.0, |c| c.effective_used_7d()),
         };
     }
     let target = ranked.iter().find(|(c, _)| {
@@ -84,11 +104,77 @@ pub(crate) fn decide(
             alias: c.alias.clone(),
             from_pressure: cur_pressure,
             to_pressure: pressure(c),
+            reason: SwitchReason::Threshold,
         },
         None => Decision::Blocked {
             pressure: cur_pressure,
         },
     }
+}
+
+/// Check local plan dates before fetching usage for the pool.
+pub(crate) fn plan_ending_gate(
+    current: &str,
+    plan_until: &HashMap<String, i64>,
+    now: i64,
+    days: u32,
+) -> bool {
+    let latest = now.saturating_add(i64::from(days) * 86_400);
+    plan_until.iter().any(|(alias, &until)| {
+        alias != current
+            && now < until
+            && until <= latest
+            && plan_until.get(current).is_none_or(|&end| until < end)
+    })
+}
+
+/// Prefer the earliest eligible plan end; equal dates preserve pool ranking.
+pub(crate) fn decide_with_plans(
+    current: &str,
+    ranked: &[(usage::Candidate, f64)],
+    plan_until: &HashMap<String, i64>,
+    now: i64,
+    limited_now: bool,
+    opts: &AutoOptions,
+    safety_7d: f64,
+) -> Decision {
+    let fallback = decide(current, ranked, limited_now, opts, safety_7d);
+    let Some(days) = opts.prefer_expiring_days else {
+        return fallback;
+    };
+    let cur_pressure = ranked
+        .iter()
+        .find(|(c, _)| c.alias == current)
+        .map_or(0.0, |(c, _)| pressure(c));
+    let cur_pressure = if limited_now { 100.0 } else { cur_pressure };
+    let latest = now.saturating_add(i64::from(days) * 86_400);
+    let target = ranked
+        .iter()
+        .filter_map(|(c, _)| {
+            let &until = plan_until.get(&c.alias)?;
+            (c.alias != current
+                && usage::is_candidate_eligible(c, safety_7d)
+                && now < until
+                && until <= latest
+                && pressure(c) <= opts.threshold - opts.margin
+                && (cur_pressure >= opts.threshold
+                    || plan_until.get(current).is_none_or(|&end| until < end)))
+            .then_some((c, until))
+        })
+        .min_by_key(|(_, until)| *until);
+    match target {
+        Some((c, _)) => Decision::Switch {
+            alias: c.alias.clone(),
+            from_pressure: cur_pressure,
+            to_pressure: pressure(c),
+            reason: SwitchReason::PlanEnding,
+        },
+        None => fallback,
+    }
+}
+
+pub(crate) fn stay_line(alias: &str, used_5h: f64, used_7d: f64) -> String {
+    format!("auto: '{alias}' at 5h {used_5h:.0}%, 7d {used_7d:.0}%, staying")
 }
 
 /// Tell the person who minimized the window that something happened: the terminal
@@ -194,13 +280,30 @@ pub(crate) async fn tick(opts: &AutoOptions, current: &str, marker: &str) -> Res
     );
     let pre: Vec<_> = single.iter().map(|(c, _, s)| (c.clone(), *s)).collect();
     let first = decide(current, &pre, limited_now, opts, safety_7d);
-    if matches!(first, Decision::Stay { .. }) {
+    let mut plan_until = HashMap::new();
+    if opts.prefer_expiring_days.is_some() {
+        for alias in profile::list_profiles()? {
+            if let Some(until) =
+                auth::read_account_info(&profile::profile_auth_path(&alias)?).subscription_until
+            {
+                plan_until.insert(alias, until);
+            }
+        }
+    }
+    let now = auth::now_unix_secs();
+    if matches!(first, Decision::Stay { .. })
+        && opts
+            .prefer_expiring_days
+            .is_none_or(|days| !plan_ending_gate(current, &plan_until, now, days))
+    {
         return Ok(first);
     }
 
     let pool = rank_pool(marker).await?;
     let ranked: Vec<_> = pool.iter().map(|(c, _, s)| (c.clone(), *s)).collect();
-    Ok(decide(current, &ranked, limited_now, opts, safety_7d))
+    Ok(decide_with_plans(
+        current, &ranked, &plan_until, now, limited_now, opts, safety_7d,
+    ))
 }
 
 fn apply(current: &str, alias: &str) -> Result<bool> {
@@ -235,6 +338,14 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
             "{}",
             color::dim("Leave this window open (you can minimize it). Stop with Ctrl+C or by closing the window.")
         );
+        if let Some(days) = opts.prefer_expiring_days {
+            println!(
+                "{}",
+                color::dim(&format!(
+                    "Prefers an account whose plan ends within {days} days."
+                ))
+            );
+        }
     }
     let mut last_switch: Option<Instant> = None;
     let mut last_blocked = false;
@@ -260,13 +371,17 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                 }
                 None
             }
-            Ok(Decision::Stay { pressure }) => {
+            Ok(Decision::Stay {
+                pressure,
+                used_5h,
+                used_7d,
+            }) => {
                 last_blocked = false;
                 emit(
                     &opts,
                     "ok",
-                    serde_json::json!({ "alias": current, "pressure": pressure }),
-                    color::dim(&format!("auto: '{current}' at {pressure:.0}%, staying")),
+                    serde_json::json!({ "alias": current, "pressure": pressure, "used_5h": used_5h, "used_7d": used_7d }),
+                    color::dim(&stay_line(&current, used_5h, used_7d)),
                 );
                 Some(EXIT_NOTHING_TO_DO)
             }
@@ -295,12 +410,21 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                 alias,
                 from_pressure,
                 to_pressure,
+                reason,
             }) => {
                 last_blocked = false;
+                let (reason, suffix) = match reason {
+                    SwitchReason::Threshold => ("threshold", ""),
+                    SwitchReason::PlanEnding => (
+                        "plan_ending",
+                        ": its plan ends soonest, using it first",
+                    ),
+                };
                 let detail = serde_json::json!({
                     "from": current, "to": alias,
                     "from_pressure": from_pressure, "to_pressure": to_pressure,
                     "dry_run": opts.dry_run,
+                    "reason": reason,
                 });
                 let summary = format!(
                     "'{current}' ({from_pressure:.0}%) -> '{alias}' ({to_pressure:.0}%)"
@@ -318,7 +442,7 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                         &opts,
                         "would_switch",
                         detail,
-                        format!("auto: would switch {summary}"),
+                        format!("auto: would switch {summary}{suffix}"),
                     );
                     Some(EXIT_NOTHING_TO_DO)
                 } else if apply(&current, &alias)? {
@@ -326,13 +450,13 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                     notify(
                         &opts,
                         "paper-codex-switch: switched account",
-                        &format!("{current} ({from_pressure:.0}%) -> {alias} ({to_pressure:.0}%)"),
+                        &format!("{current} ({from_pressure:.0}%) -> {alias} ({to_pressure:.0}%){suffix}"),
                     );
                     emit(
                         &opts,
                         "switched",
                         detail,
-                        color::success(&format!("auto: switched {summary}")),
+                        color::success(&format!("auto: switched {summary}{suffix}")),
                     );
                     Some(EXIT_SWITCHED)
                 } else {
@@ -378,6 +502,7 @@ mod tests {
             dry_run: false,
             json: false,
             toast: false,
+            prefer_expiring_days: None,
         }
     }
 

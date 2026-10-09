@@ -128,6 +128,7 @@ The `.exe` is not code-signed yet, and Microsoft Defender's machine-learning det
 ```bash
 paper-codex-switch auto                    # foreground loop, checks every 60s
 paper-codex-switch auto --threshold 80     # switch earlier (default 90)
+paper-codex-switch auto --threshold 95 --prefer-expiring # use an account whose plan ends soon first
 paper-codex-switch auto --dry-run          # log what it would do, never switch
 paper-codex-switch auto --toast            # also show a Windows notification on a switch or when no account is left
 paper-codex-switch --json auto --once      # one check, for cron / Task Scheduler
@@ -137,6 +138,7 @@ paper-codex-switch --json auto --once      # one check, for cron / Task Schedule
 |---|---|---|
 | `--threshold` | 90 | switch when the 5h or 7d window reaches this used % |
 | `--margin` | 10 | target must be at least this many points below the active account |
+| `--prefer-expiring [DAYS]` | off; 7 when given without DAYS | use the eligible account whose plan ends soonest within DAYS, even below the threshold; below the threshold it must end before the current plan, and its usage must be at most threshold minus margin |
 | `--interval` | 60 | seconds between checks |
 | `--cooldown` | 300 | minimum seconds between two switches |
 | `--once` | off | single check, then exit |
@@ -145,7 +147,7 @@ paper-codex-switch --json auto --once      # one check, for cron / Task Schedule
 
 How it decides:
 
-1. Every `--interval` it checks only the active account. Below the threshold: nothing else happens (no traffic for the other accounts).
+1. Every `--interval` it checks only the active account. Below the threshold: nothing else happens (no traffic for the other accounts), unless `--prefer-expiring` finds an earlier plan end in the local profile files.
 2. At or above the threshold it refreshes all accounts, ranks them with the same scoring as `use`, and picks the best eligible one that is under the threshold and `--margin` points lower.
 3. The switch is a compare-and-swap on the active marker, so it never overwrites a change made by another process. A running Codex app-server daemon is restarted afterwards, like after `use`.
 4. If every account is exhausted it backs off to a 10-minute cadence. Usage-check errors keep the current account and retry.
