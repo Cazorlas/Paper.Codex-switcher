@@ -505,6 +505,41 @@ mod tests {
     }
 
     #[test]
+    fn c1_auto_prefer_expiring_defaults_to_seven_days() {
+        let cli = Cli::try_parse_from(["paper-codex-switch", "auto", "--prefer-expiring"])
+            .expect("--prefer-expiring without a value must parse");
+        match cli.command {
+            Commands::Auto { prefer_expiring, .. } => assert_eq!(prefer_expiring, Some(7)),
+            other => panic!("expected auto, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn c2_auto_prefer_expiring_accepts_days_and_threshold() {
+        let cli = Cli::try_parse_from([
+            "paper-codex-switch", "auto", "--prefer-expiring", "3", "--threshold", "95",
+        ])
+        .expect("--prefer-expiring with explicit days and threshold must parse");
+        match cli.command {
+            Commands::Auto { prefer_expiring, threshold, .. } => {
+                assert_eq!(prefer_expiring, Some(3));
+                assert_eq!(threshold, 95.0);
+            }
+            other => panic!("expected auto, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn c3_auto_prefer_expiring_is_opt_in() {
+        let cli = Cli::try_parse_from(["paper-codex-switch", "auto"])
+            .expect("auto without --prefer-expiring must parse");
+        match cli.command {
+            Commands::Auto { prefer_expiring, .. } => assert_eq!(prefer_expiring, None),
+            other => panic!("expected auto, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn provider_help_marks_beta_and_explains_its_scope() {
         let top_help = Cli::try_parse_from(["paper-codex-switch", "--help"])
             .err()

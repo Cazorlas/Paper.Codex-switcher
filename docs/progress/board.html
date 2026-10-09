@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex-switcher progress</title>
+<style>
+:root{--bg:#fff;--fg:#1b1b1b;--mut:#666;--line:#ddd;--ok:#1a7f37;--run:#9a6700;--todo:#888}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--fg:#eee;--mut:#aaa;--line:#333;--ok:#3fb950;--run:#d29922;--todo:#777}}
+:root[data-theme="dark"]{--bg:#111;--fg:#eee;--mut:#aaa;--line:#333;--ok:#3fb950;--run:#d29922;--todo:#777}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;margin:0;padding:16px;max-width:860px}
+h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:12px 0}
+.s{font-weight:600}.done{color:var(--ok)}.run{color:var(--run)}.todo{color:var(--todo)}li{margin:2px 0}small{color:var(--mut)}
+code{font-size:13px;word-break:break-word}
+</style></head><body>
+<h1>Paper.Codex-switcher - progress</h1>
+<article id="auto-prefer-expiring">
+<h2>auto --prefer-expiring + two-window status line</h2>
+<small>Started 2026-10-09 - branch <code>collab/main/auto-prefer-expiring</code></small>
+<p>Problem: auto stays on paperengineer07 (35%) while paperengineer05's plan ends in 3 days with quota unused; the staying line shows only the busier window.</p>
+<ul>
+<li class="s done">Plan + test contract (D1-D13, G1-G4, S1-S2, C1-C3)</li>
+<li class="s run">T1 red tests (Codex)</li>
+<li class="s todo">T2 green: implement, CLI flag, README en/vi</li>
+<li class="s todo">Review, merge, release v1.0.17</li>
+<li class="s todo">Cleanup</li>
+</ul>
+</article>
+</body></html>

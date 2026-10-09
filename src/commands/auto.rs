@@ -478,3 +478,6 @@ mod tests {
         ));
     }
 }
+#[cfg(test)]
+#[path = "auto_expiring_tests.rs"]
+mod expiring_tests;
