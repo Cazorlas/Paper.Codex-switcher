@@ -11,6 +11,19 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="delete-by-index">
+<h2>Delete profiles by list index</h2>
+<small>Started 2026-10-12</small>
+<p>Allow <code>delete 2</code> to select the second saved profile in list order, with numeric aliases taking precedence. Preserve confirmation, active-profile protection and recovery.</p>
+<ul>
+<li class="s done">Plan: reuse use-command index resolution; verify selection, numeric aliases, invalid indices, confirmation and active-profile protection with isolated CLI fixtures.</li>
+<li class="s done">Red tests reviewed and locked: Windows GNU CLI run reports 4 expected failures and 2 passes; index resolution is missing. Default MSVC linker setup is unavailable.</li>
+<li class="s done">Green: two-line index resolution, CLI help and English/Vietnamese README; all six locked CLI regression tests pass.</li>
+<li class="s done">Review: only six scoped files changed; diff and delete --help verified. Windows GNU cargo test --locked --offline --lib --test cli_edge_cases: 788 unit + 45 CLI passed. cargo build --locked --offline passed. cargo fmt --all -- --check reports existing formatting differences outside the new changes.</li>
+<li class="s done">Merged to main; task/delete-by-index branch deleted and git worktree prune completed. No task worktree was created. Installed-app update stays with the owner.</li>
+<li class="s todo">Cleanup gap: eight verified synthetic red-test directories in the Windows Temp folder remain; automatic execution policy rejected recursive removal even with exact literal paths.</li>
+</ul>
+</article>
 <article id="auto-prefer-expiring">
 <h2>auto --prefer-expiring + two-window status line</h2>
 <small>Started 2026-10-09 - branch <code>collab/main/auto-prefer-expiring</code></small>

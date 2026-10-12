@@ -723,6 +723,192 @@ fn delete_rejects_active_profile() {
     let _ = fs::remove_dir_all(home);
 }
 
+fn seed_delete_index_profiles(home: &Path) {
+    for alias in ["zeta", "alpha", "middle"] {
+        write_json(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json")),
+            &auth_json(&format!("{alias}@example.com"), &format!("acct_{alias}")),
+        );
+    }
+}
+
+#[test]
+fn delete_index_uses_sorted_list_and_can_restore_selected_profile() {
+    let home = temp_home("delete-index-sorted");
+    seed_delete_index_profiles(&home);
+    let selected = home.join(".paper-codex-switch/profiles/middle/auth.json");
+    let original = fs::read(&selected).unwrap();
+
+    let output = run(&home, &["--json", "delete", "2", "--yes"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(
+        parse_stdout_json(&output),
+        serde_json::json!({"ok": true, "alias": "middle", "action": "deleted"})
+    );
+    assert!(!selected.exists());
+    for alias in ["alpha", "zeta"] {
+        assert!(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"))
+                .exists()
+        );
+    }
+
+    let output = run(&home, &["--json", "restore", "middle"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(fs::read(selected).unwrap(), original);
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn delete_index_prefers_matching_numeric_alias() {
+    let home = temp_home("delete-index-numeric-alias");
+    for alias in ["2", "alpha", "zeta"] {
+        write_json(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json")),
+            &auth_json(&format!("{alias}@example.com"), &format!("acct_{alias}")),
+        );
+    }
+
+    let output = run(&home, &["--json", "delete", "2", "--yes"]);
+    assert!(output.status.success());
+    assert_eq!(
+        parse_stdout_json(&output),
+        serde_json::json!({"ok": true, "alias": "2", "action": "deleted"})
+    );
+    assert!(!home.join(".paper-codex-switch/profiles/2").exists());
+    for alias in ["alpha", "zeta"] {
+        assert!(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"))
+                .exists()
+        );
+    }
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn delete_index_invalid_numbers_preserve_profiles_current_and_archive() {
+    let home = temp_home("delete-index-invalid");
+    seed_delete_index_profiles(&home);
+    let current = home.join(".paper-codex-switch/current");
+    fs::write(&current, "zeta").unwrap();
+    let archive = home.join(".paper-codex-switch/deleted-profiles/retained.backup-test/auth.json");
+    write_json(
+        &archive,
+        &auth_json("retained@example.com", "acct_retained"),
+    );
+    let archive_before = fs::read(&archive).unwrap();
+    let profiles_before: Vec<_> = ["alpha", "middle", "zeta"]
+        .into_iter()
+        .map(|alias| {
+            let path = home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"));
+            let contents = fs::read(&path).unwrap();
+            (path, contents)
+        })
+        .collect();
+
+    for input in ["0", "4", "9999999999999999999999999999999999999999"] {
+        let output = run(&home, &["--json", "delete", input, "--yes"]);
+        assert!(!output.status.success(), "unexpected success for {input}");
+        let report = parse_stdout_json(&output);
+        assert_eq!(report["ok"], false);
+        assert!(report["error"].as_str().unwrap().contains(input));
+        assert_eq!(fs::read_to_string(&current).unwrap(), "zeta");
+        for (path, contents) in &profiles_before {
+            assert_eq!(fs::read(path).unwrap(), *contents);
+        }
+        assert_eq!(fs::read(&archive).unwrap(), archive_before);
+        assert_eq!(
+            fs::read_dir(home.join(".paper-codex-switch/deleted-profiles"))
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn delete_index_rejects_active_resolved_profile() {
+    let home = temp_home("delete-index-active");
+    seed_delete_index_profiles(&home);
+    let current = home.join(".paper-codex-switch/current");
+    fs::write(&current, "middle").unwrap();
+
+    let output = run(&home, &["--json", "delete", "2", "--yes"]);
+    assert!(!output.status.success());
+    let report = parse_stdout_json(&output);
+    let error = report["error"].as_str().unwrap();
+    assert!(
+        error.contains("cannot delete the active profile"),
+        "{error}"
+    );
+    assert!(error.contains("middle"), "{error}");
+    assert_eq!(fs::read_to_string(current).unwrap(), "middle");
+    for alias in ["alpha", "middle", "zeta"] {
+        assert!(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"))
+                .exists()
+        );
+    }
+    assert!(!home.join(".paper-codex-switch/deleted-profiles").exists());
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn delete_index_json_confirmation_names_resolved_profile() {
+    let home = temp_home("delete-index-json-confirm");
+    seed_delete_index_profiles(&home);
+
+    let output = run(&home, &["--json", "delete", "2"]);
+    assert!(!output.status.success());
+    assert_eq!(
+        parse_stdout_json(&output),
+        serde_json::json!({
+            "ok": false,
+            "error": "confirmation required; rerun with --yes to delete profile 'middle'"
+        })
+    );
+    for alias in ["alpha", "middle", "zeta"] {
+        assert!(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"))
+                .exists()
+        );
+    }
+    assert!(!home.join(".paper-codex-switch/deleted-profiles").exists());
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn delete_index_non_interactive_confirmation_names_resolved_profile() {
+    let home = temp_home("delete-index-non-interactive-confirm");
+    seed_delete_index_profiles(&home);
+
+    let mut cmd = command(&home, &["delete", "2"]);
+    cmd.stdin(Stdio::null());
+    let output = cmd.output().unwrap();
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("confirmation required; rerun with --yes to delete profile 'middle'")
+    );
+    for alias in ["alpha", "middle", "zeta"] {
+        assert!(
+            home.join(format!(".paper-codex-switch/profiles/{alias}/auth.json"))
+                .exists()
+        );
+    }
+    assert!(!home.join(".paper-codex-switch/deleted-profiles").exists());
+    let _ = fs::remove_dir_all(home);
+}
+
 #[test]
 fn import_directory_recursively_validates_and_reports_results() {
     let home = temp_home("import-dir");

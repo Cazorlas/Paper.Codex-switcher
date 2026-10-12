@@ -85,7 +85,7 @@ Ngày hết hạn gói lấy từ token đăng nhập của tài khoản, nên c
 | Đăng nhập lại tài khoản hết hạn | `paper-codex-switch login <tên đã có>` |
 | Nhập tệp `auth.json` hoặc một thư mục chứa chúng | `paper-codex-switch import <đường dẫn> [tên]` |
 | Đổi tên | `paper-codex-switch rename <cũ> <mới>` |
-| Xóa (được lưu lại để khôi phục; không xóa được tài khoản đang dùng) | `paper-codex-switch delete <tên> [--yes]` |
+| Xóa (được lưu lại để khôi phục; không xóa được tài khoản đang dùng) | `paper-codex-switch delete <tên/số thứ tự> [--yes]` |
 | Xem tài khoản đã xóa / khôi phục | `paper-codex-switch restore` / `paper-codex-switch restore <tên> [--as <tên mới>]` |
 | Làm mới hạn mức ngay, bỏ qua bộ nhớ đệm | `paper-codex-switch list --force` |
 | Bắt đầu đồng hồ 5 giờ của tài khoản mới | `paper-codex-switch warmup [tên]` |
@@ -95,7 +95,7 @@ Ngày hết hạn gói lấy từ token đăng nhập của tài khoản, nên c
 
 Cờ chung: `--json` / `--json-pretty` (xuất cho máy đọc), `--proxy <url>`, `--color always|never`, `--debug`. Cấu hình nằm ở `~/.paper-codex-switch/config.toml` (cũng sửa được trong tab Settings của `tui`).
 
-Muốn bỏ bớt tài khoản không dùng: `list`, rồi `delete <tên>`. Xóa không phải là mất hẳn: `restore` liệt kê những gì đã xóa và `restore <tên>` đưa bản mới nhất về (dùng `--as` nếu tên đã bị chiếm). Bản lưu nằm ở `~/.paper-codex-switch/deleted-profiles`. `auto` chỉ đổi giữa các tài khoản đang lưu, nên xóa một tài khoản cũng là đưa nó ra khỏi vòng đổi.
+Muốn bỏ bớt tài khoản không dùng: `list`, rồi `delete <tên|số thứ tự>` (ví dụ `paper-codex-switch delete 2`). Số thứ tự bắt đầu từ 1, theo thứ tự trong `list`; xem lại danh sách sau khi xóa vì số thứ tự có thể thay đổi. Nếu đã có tài khoản mang tên số đó, tên được ưu tiên hơn số thứ tự. Xóa không phải là mất hẳn: `restore` liệt kê những gì đã xóa và `restore <tên>` đưa bản mới nhất về (dùng `--as` nếu tên đã bị chiếm). Bản lưu nằm ở `~/.paper-codex-switch/deleted-profiles`. `auto` chỉ đổi giữa các tài khoản đang lưu, nên xóa một tài khoản cũng là đưa nó ra khỏi vòng đổi.
 
 ### Cập nhật / gỡ cài đặt
 

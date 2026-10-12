@@ -230,8 +230,11 @@ Examples:
         new: String,
     },
     /// Delete a profile (archived for recovery)
+    #[command(
+        after_help = "Indices follow the order in `list` and may change after deletion. An existing numeric alias takes precedence over an index."
+    )]
     Delete {
-        /// Profile alias
+        /// Profile alias or 1-based index from list
         alias: String,
         /// Skip the confirmation prompt (required with --json or when stdin is not a terminal)
         #[arg(long, short)]

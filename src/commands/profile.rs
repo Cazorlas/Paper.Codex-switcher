@@ -365,6 +365,8 @@ pub(crate) fn restore_cmd(alias: Option<&str>, as_alias: Option<&str>, json: boo
 pub(crate) fn delete_cmd(alias: &str, yes: bool, json: bool) -> Result<()> {
     use std::io::IsTerminal;
 
+    let by_index = resolve_profile_index(alias);
+    let alias = by_index.as_deref().unwrap_or(alias);
     profile::validate_alias(alias)?;
     if profile::read_current() == alias {
         anyhow::bail!("cannot delete the active profile '{alias}'");
