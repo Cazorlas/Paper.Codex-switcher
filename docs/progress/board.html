@@ -21,7 +21,7 @@ code{font-size:13px;word-break:break-word}
 <li class="s done">Green: two-line index resolution, CLI help and English/Vietnamese README; all six locked CLI regression tests pass.</li>
 <li class="s done">Review: only six scoped files changed; diff and delete --help verified. Windows GNU cargo test --locked --offline --lib --test cli_edge_cases: 788 unit + 45 CLI passed. cargo build --locked --offline passed. cargo fmt --all -- --check reports existing formatting differences outside the new changes.</li>
 <li class="s done">Merged to main; task/delete-by-index branch deleted and git worktree prune completed. No task worktree was created. Installed-app update stays with the owner.</li>
-<li class="s run">Release v1.0.18: four version entries reviewed; Windows GNU build --locked --offline passed and binary --version reports 1.0.18. Merge and tag next; confirm four GitHub release binaries and npm latest, then remove the release branch. Installed-app update remains with the owner.</li>
+<li class="s run">Release v1.0.18: version contract and Windows GNU build verified; tag pushed at b4ef17f. CI for the feature commit passed. Publication handed to release workflow 38188402073; final GitHub/npm outcome not verified because the owner requested leaving it to publish automatically. Release branch merged and removed; installed-app update remains with the owner.</li>
 <li class="s todo">Cleanup gap: eight verified synthetic red-test directories in the Windows Temp folder remain; automatic execution policy rejected recursive removal even with exact literal paths.</li>
 </ul>
 </article>
