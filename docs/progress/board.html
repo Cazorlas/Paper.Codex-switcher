@@ -26,7 +26,9 @@ code{font-size:13px;word-break:break-word}
 <li class="s done">Live read-only: target/debug/paper-codex-switch.exe --json doctor and doctor both exit 0; PATH CLI 0.162.1 reports aligned, aligned_version 0.162.1, minimum_version 0.159.2. Desktop engine not checked by doctor; no OAuth/quota/warmup/account-switch live validation.</li>
 <li class="s done">English/Vietnamese README, upstream NOTICE and docs/codex-compatibility.md updated.</li>
 <li class="s done">Release preparation 1.0.19: Cargo.toml, Cargo.lock, VERSION and npm/package.json agree; fresh Windows GNU build --locked --offline passed. Binary --version reports 1.0.19; live JSON doctor exit 0, PATH Codex 0.162.1 aligned.</li>
-<li class="s run">Owner authorized commit/push/release: integrate release/v1.0.19 into main and push v1.0.19; verify CI, four GitHub assets and npm publication. Installed-package update not requested.</li>
+<li class="s done">Merged and pushed main/tag v1.0.19 at 06e57c6. Temporary release/v1.0.19 branch removed after fast-forward merge; git worktree prune completed, no task worktree created.</li>
+<li class="s done">Released v1.0.19: workflow 38528287241 succeeded, including all four builds and publish-npm; CI 38528282444 / 38528287238 both succeeded. GitHub release is public/stable with four nonempty assets; npm registry confirms 1.0.19 and latest=1.0.19. Initial npm CLI lookup saw stale metadata during publication propagation; uncached official registry read verified the new version.</li>
+<li class="s done">Release notes published; branch cleanup complete. Installed-package update not requested. No real OAuth, quota or account-switch live validation added by release.</li>
 <li class="s todo">Cleanup gap: automatic execution policy rejected recursive removal of this turn's two synthetic red doctor fixtures in Temp (blocked by policy); both remain. Names: codex-switch-launch-doctor-codex-version-1791959121405958400-0 and codex-switch-launch-doctor-current-codex-version-1791959121405932500-1.</li>
 </ul>
 </article>
