@@ -2259,8 +2259,14 @@ fn doctor_reports_path_and_explicit_desktop_engine_versions_as_json() {
         .unwrap_or_else(|error| panic!("expected one JSON report ({error}): {stdout}"));
     assert_eq!(report["ok"], true);
     assert_eq!(report["minimum_version"], "0.159.2");
+    assert_eq!(report["aligned_version"], "0.162.1");
     assert_eq!(report["path_cli"]["version"], "0.159.2");
+    assert_eq!(report["path_cli"]["status"], "below_baseline_unverified");
     assert_eq!(report["desktop_codex"]["version"], "0.159.2");
+    assert_eq!(
+        report["desktop_codex"]["status"],
+        "below_baseline_unverified"
+    );
     assert_eq!(report["versions_match"], true);
     assert!(
         report["path_cli"]["executable"]
@@ -2268,6 +2274,33 @@ fn doctor_reports_path_and_explicit_desktop_engine_versions_as_json() {
             .unwrap()
             .contains("codex")
     );
+    assert!(String::from_utf8_lossy(&output.stderr).is_empty());
+    let _ = fs::remove_dir_all(home);
+}
+
+#[test]
+fn doctor_reports_current_verified_codex_as_aligned() {
+    let home = temp_home("doctor-current-codex-version");
+    let (fake_bin, log) = install_fake_codex(&home);
+    let output = run_env(
+        &home,
+        &fake_bin,
+        &log,
+        &["--json", "doctor"],
+        &[("CS_FAKE_CODEX_VERSION", "0.162.1")],
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["minimum_version"], "0.159.2");
+    assert_eq!(report["aligned_version"], "0.162.1");
+    assert_eq!(report["path_cli"]["version"], "0.162.1");
+    assert_eq!(report["path_cli"]["status"], "aligned");
+    assert!(report["path_cli"]["note"].is_null());
     assert!(String::from_utf8_lossy(&output.stderr).is_empty());
     let _ = fs::remove_dir_all(home);
 }

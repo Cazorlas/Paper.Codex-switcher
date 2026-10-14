@@ -56,6 +56,7 @@ fn status_name(status: crate::codex_compat::CompatibilityStatus) -> &'static str
         Status::NotFound => "not_found",
         Status::Unknown => "unknown",
         Status::BelowMinimum => "below_minimum",
+        Status::BelowBaselineUnverified => "below_baseline_unverified",
         Status::Aligned => "aligned",
         Status::AboveBaselineUnverified => "above_baseline_unverified",
     }

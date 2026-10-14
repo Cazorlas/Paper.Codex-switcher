@@ -7,7 +7,7 @@ use semver::Version;
 use serde::Serialize;
 
 pub(crate) const MINIMUM_CODEX_VERSION: &str = "0.159.2";
-pub(crate) const ALIGNED_CODEX_VERSION: &str = "0.159.2";
+pub(crate) const ALIGNED_CODEX_VERSION: &str = "0.162.1";
 pub(crate) const CLI_UPGRADE_NPM_COMMAND: &str = "npm install -g @openai/codex@latest";
 const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(4);
 
@@ -18,6 +18,7 @@ pub(crate) enum CompatibilityStatus {
     NotFound,
     Unknown,
     BelowMinimum,
+    BelowBaselineUnverified,
     Aligned,
     AboveBaselineUnverified,
 }
@@ -62,6 +63,9 @@ impl Probe {
             Some(version) if version.cmp_precedence(&aligned_version()).is_eq() => {
                 CompatibilityStatus::Aligned
             }
+            Some(version) if version.cmp_precedence(&aligned_version()).is_lt() => {
+                CompatibilityStatus::BelowBaselineUnverified
+            }
             Some(_) => CompatibilityStatus::AboveBaselineUnverified,
         };
         VersionReport {
@@ -69,9 +73,15 @@ impl Probe {
             version: self.version.as_ref().map(ToString::to_string),
             status,
             note: self.failure.clone().or_else(|| {
-                (status == CompatibilityStatus::AboveBaselineUnverified).then(|| {
-                    "meets the minimum version, but is newer than the currently verified baseline; full compatibility is not guaranteed".to_string()
-                })
+                match status {
+                    CompatibilityStatus::BelowBaselineUnverified => Some(
+                        "meets the minimum version, but is older than the currently verified baseline; full compatibility is not guaranteed".to_string(),
+                    ),
+                    CompatibilityStatus::AboveBaselineUnverified => Some(
+                        "meets the minimum version, but is newer than the currently verified baseline; full compatibility is not guaranteed".to_string(),
+                    ),
+                    _ => None,
+                }
             }),
         }
     }
@@ -218,7 +228,9 @@ pub(crate) fn doctor_report(desktop_path: Option<&Path>) -> DoctorReport {
     let healthy = |report: &VersionReport| {
         matches!(
             report.status,
-            CompatibilityStatus::Aligned | CompatibilityStatus::AboveBaselineUnverified
+            CompatibilityStatus::Aligned
+                | CompatibilityStatus::BelowBaselineUnverified
+                | CompatibilityStatus::AboveBaselineUnverified
         )
     };
     let ok = healthy(&path_cli)
@@ -401,13 +413,58 @@ mod tests {
         let old = executable(dir.path(), "old-codex", "echo 0.159.1");
         assert!(!probe_executable(&old).meets_minimum());
 
-        let release_with_build = executable(dir.path(), "build-codex", "echo 0.159.2+build.7");
+        let release_with_build = executable(dir.path(), "build-codex", "echo 0.162.1+build.7");
         let probe = probe_executable(&release_with_build);
         assert!(probe.meets_minimum());
         assert_eq!(probe.report().status, CompatibilityStatus::Aligned);
 
         let prerelease = executable(dir.path(), "prerelease-codex", "echo 0.159.2-rc.1");
         assert!(!probe_executable(&prerelease).meets_minimum());
+    }
+
+    #[test]
+    fn compatibility_report_distinguishes_minimum_and_verified_baseline() {
+        assert_eq!(MINIMUM_CODEX_VERSION, "0.159.2");
+        assert_eq!(ALIGNED_CODEX_VERSION, "0.162.1");
+        for (version, accepted, status, note_direction) in [
+            ("0.159.1", false, "below_minimum", None),
+            ("0.159.2", true, "below_baseline_unverified", Some("older")),
+            ("0.160.0", true, "below_baseline_unverified", Some("older")),
+            (
+                "0.162.1-rc.1",
+                true,
+                "below_baseline_unverified",
+                Some("older"),
+            ),
+            ("0.162.1", true, "aligned", None),
+            ("0.162.1+build.7", true, "aligned", None),
+            ("1.0.0", true, "above_baseline_unverified", Some("newer")),
+        ] {
+            let probe = Probe {
+                executable: PathBuf::from("codex"),
+                version: Some(Version::parse(version).unwrap()),
+                failure: None,
+            };
+            assert_eq!(probe.meets_minimum(), accepted, "{version}");
+            let report = probe.report();
+            assert_eq!(
+                serde_json::to_value(report.status).unwrap(),
+                status,
+                "{version}"
+            );
+            assert_eq!(report.version.as_deref(), Some(version));
+            match note_direction {
+                Some(direction) => {
+                    let note = report.note.unwrap();
+                    assert!(note.contains(direction), "{version}: {note}");
+                    assert!(
+                        note.contains("full compatibility is not guaranteed"),
+                        "{version}: {note}"
+                    );
+                }
+                None => assert!(report.note.is_none(), "{version}"),
+            }
+        }
     }
 
     #[test]

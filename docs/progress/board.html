@@ -11,6 +11,25 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="codex-01621-alignment">
+<h2>Codex 0.162.1 compatibility baseline</h2>
+<small>Started 2026-10-14</small>
+<p>Align the transport fallback and doctor baseline with the latest stable Codex CLI, retaining the 0.159.2 minimum and accurately reporting older supported engines.</p>
+<ul>
+<li class="s done">Plan: official changelog, npm latest and OpenAI release API checked; installed CLI is 0.162.1. Upstream fallback prompt and login library unchanged; nested ModelMessages adds optional content_filter_guidance.</li>
+<li class="s done">Repro: live read-only doctor sees installed CLI 0.162.1, but reports baseline 0.159.2 and above_baseline_unverified; expected baseline 0.162.1 and aligned.</li>
+<li class="s done">Test contract: 0.159.1 blocked; 0.159.2 accepted with below_baseline_unverified; 0.162.1 and its build metadata aligned; future stable version above_baseline_unverified; missing transport version falls back to 0.162.1.</li>
+<li class="s done">Red worker: compatibility 5 passed / 2 expected failures; auth fallback 1 expected failure; doctor 2 expected failures. Tests reviewed and locked; product unchanged.</li>
+<li class="s done">Green worker: compatibility 7/7, auth fallback 1/1, doctor integration 2/2 passed; locked tests unchanged. Product limited to codex_compat.rs and commands/doctor.rs.</li>
+<li class="s done">Review: baseline/minimum separation, semver prereleases/build metadata, directional notes and both doctor output modes checked. Health workflow minor raised to 162 after static auth/token/usage contract comparison; prompt hash unchanged.</li>
+<li class="s done">Final: cargo +stable-x86_64-pc-windows-gnu test --locked --offline passed 789 unit + 154 integration tests (943 total, zero failures); cargo +stable-x86_64-pc-windows-gnu build --locked --offline passed. git diff --check and health/baseline consistency check passed.</li>
+<li class="s done">Live read-only: target/debug/paper-codex-switch.exe --json doctor and doctor both exit 0; PATH CLI 0.162.1 reports aligned, aligned_version 0.162.1, minimum_version 0.159.2. Desktop engine not checked by doctor; no OAuth/quota/warmup/account-switch live validation.</li>
+<li class="s done">English/Vietnamese README, upstream NOTICE and docs/codex-compatibility.md updated.</li>
+<li class="s done">Release preparation 1.0.19: Cargo.toml, Cargo.lock, VERSION and npm/package.json agree; fresh Windows GNU build --locked --offline passed. Binary --version reports 1.0.19; live JSON doctor exit 0, PATH Codex 0.162.1 aligned.</li>
+<li class="s run">Owner authorized commit/push/release: integrate release/v1.0.19 into main and push v1.0.19; verify CI, four GitHub assets and npm publication. Installed-package update not requested.</li>
+<li class="s todo">Cleanup gap: automatic execution policy rejected recursive removal of this turn's two synthetic red doctor fixtures in Temp (blocked by policy); both remain. Names: codex-switch-launch-doctor-codex-version-1791959121405958400-0 and codex-switch-launch-doctor-current-codex-version-1791959121405932500-1.</li>
+</ul>
+</article>
 <article id="delete-by-index">
 <h2>Delete profiles by list index</h2>
 <small>Started 2026-10-12</small>

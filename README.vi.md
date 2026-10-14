@@ -23,6 +23,7 @@ Lưu nhiều tài khoản Codex, xem hạn mức 5 giờ và hạn mức tuần 
 ## Yêu cầu
 
 - [Codex CLI](https://github.com/openai/codex) bản 0.159.2 trở lên có trong `PATH` (`paper-codex-switch doctor` sẽ kiểm tra).
+- Mốc đối chiếu hợp đồng với Codex hiện tại: **0.162.1**. `doctor` báo bản cũ hơn nhưng đủ minimum là `below_baseline_unverified`, bản mới hơn là `above_baseline_unverified`; cả hai vẫn được chấp nhận. Xem [bằng chứng tương thích](docs/codex-compatibility.md) để biết phạm vi đã kiểm chứng.
 - Codex phải dùng kho thông tin đăng nhập dạng tệp. Thêm vào `~/.codex/config.toml`:
 
   ```toml

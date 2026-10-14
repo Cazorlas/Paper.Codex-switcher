@@ -23,6 +23,7 @@ Save several Codex logins, see every account's 5-hour and weekly quota in one da
 ## Requirements
 
 - [Codex CLI](https://github.com/openai/codex) 0.159.2 or newer on `PATH` (`paper-codex-switch doctor` checks).
+- Current upstream contract baseline: **0.162.1**. `doctor` reports older supported engines as `below_baseline_unverified` and newer engines as `above_baseline_unverified`; both meet the minimum. See [compatibility evidence](docs/codex-compatibility.md) for validation boundaries.
 - Codex must use the file credential store. Add to `~/.codex/config.toml`:
 
   ```toml
