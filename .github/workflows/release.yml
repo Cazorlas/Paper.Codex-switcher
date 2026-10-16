@@ -45,6 +45,6 @@ jobs:
       - name: Package files
         run: cp README.md README.vi.md LICENSE THIRD_PARTY_NOTICES.md npm/
       - name: Point README image at GitHub
-        run: sed -i 's|(docs/list.png)|(https://raw.githubusercontent.com/Cazorlas/Paper.Codex-switcher/main/docs/list.png)|' npm/README.md
+        run: sed -i -e 's|(docs/list.png)|(https://raw.githubusercontent.com/Cazorlas/Paper.Codex-switcher/main/docs/list.png)|' -e 's|src="docs/logo.png"|src="https://raw.githubusercontent.com/Cazorlas/Paper.Codex-switcher/main/docs/logo.png"|' npm/README.md
       - run: npm publish --access public
         working-directory: npm

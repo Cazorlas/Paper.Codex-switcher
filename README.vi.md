@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="112" alt="paper-codex-switch logo"></p>
+
 # paper-codex-switch
 
 [English](README.md) · **Tiếng Việt**
