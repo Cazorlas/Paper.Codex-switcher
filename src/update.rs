@@ -814,7 +814,10 @@ fn extract_zip_binary(archive_path: &Path, binary_name: &str, output_path: &Path
         let mut entry = archive
             .by_index(index)
             .with_context(|| format!("reading zip entry #{index}"))?;
-        let name = entry.name().replace('\\', "/");
+        let name = entry
+            .name()
+            .with_context(|| format!("reading zip entry #{index} name"))?
+            .replace('\\', "/");
         if Path::new(&name)
             .file_name()
             .and_then(|value| value.to_str())
