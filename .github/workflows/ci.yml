@@ -6,3 +6,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: cargo test --locked
+
+  # Merge Dependabot patch/minor bumps for cargo and npm once the tests pass.
+  # Majors may need code changes; GitHub Actions bumps are not covered by this
+  # workflow (release.yml only runs on a tag), so both stay for a human.
+  dependabot-merge:
+    needs: test
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3
+      - if: steps.meta.outputs.update-type != 'version-update:semver-major' && steps.meta.outputs.package-ecosystem != 'github_actions'
+        run: gh pr merge "$PR" --squash --delete-branch --repo "$GITHUB_REPOSITORY"
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
