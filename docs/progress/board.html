@@ -11,6 +11,18 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="codex-01630-alignment">
+<h2>Codex 0.163.0 baseline, Dependabot updates, release 1.0.21</h2>
+<small>Started 2026-10-21</small>
+<p>Close health issue #7 (Codex 0.163.0 above the verified 0.162.x), merge pending Dependabot updates and adapt to zip 9.</p>
+<ul>
+<li class="s done">Dependabot #8 toml, #10 sha2, #12 tokio, #13 serde_json merged (CI green). #11 zip 9 failed to compile (ZipFile::name now returns Result); replaced by #14, which propagates the error with context; #11 closed.</li>
+<li class="s done">Upstream review rust-v0.162.1..rust-v0.163.0 (partial clone): models-manager/prompt.md and login/src/lib.rs unchanged; login only restyles HTML pages; no non-test auth, token-data, keyring or rate-limit source changed; ToolMessages adds two optional serde-defaulted fields.</li>
+<li class="s done">Live read-only with PATH Codex 0.163.0 on 1.0.20: doctor exit 0 (above_baseline_unverified), list --force refreshed quota for both accounts, auto --once --dry-run stays. codex --no-daemon, resume --last and app-server daemon restart still exist.</li>
+<li class="s done">ALIGNED_CODEX_VERSION, tests, README (EN/VI), NOTICE and docs/codex-compatibility.md moved to 0.163.0; health VERIFIED_CODEX_MINOR 163.</li>
+<li class="s todo">Not exercised: real launch ... exec with account switch (two collab Codex sessions were mid-turn), OAuth login, warmup, desktop-server restart.</li>
+</ul>
+</article>
 <article id="codex-01621-alignment">
 <h2>Codex 0.162.1 compatibility baseline</h2>
 <small>Started 2026-10-14</small>

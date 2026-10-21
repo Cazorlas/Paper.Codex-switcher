@@ -7,7 +7,7 @@ use semver::Version;
 use serde::Serialize;
 
 pub(crate) const MINIMUM_CODEX_VERSION: &str = "0.159.2";
-pub(crate) const ALIGNED_CODEX_VERSION: &str = "0.162.1";
+pub(crate) const ALIGNED_CODEX_VERSION: &str = "0.163.0";
 pub(crate) const CLI_UPGRADE_NPM_COMMAND: &str = "npm install -g @openai/codex@latest";
 const VERSION_PROBE_TIMEOUT: Duration = Duration::from_secs(4);
 
@@ -413,7 +413,7 @@ mod tests {
         let old = executable(dir.path(), "old-codex", "echo 0.159.1");
         assert!(!probe_executable(&old).meets_minimum());
 
-        let release_with_build = executable(dir.path(), "build-codex", "echo 0.162.1+build.7");
+        let release_with_build = executable(dir.path(), "build-codex", "echo 0.163.0+build.7");
         let probe = probe_executable(&release_with_build);
         assert!(probe.meets_minimum());
         assert_eq!(probe.report().status, CompatibilityStatus::Aligned);
@@ -425,19 +425,19 @@ mod tests {
     #[test]
     fn compatibility_report_distinguishes_minimum_and_verified_baseline() {
         assert_eq!(MINIMUM_CODEX_VERSION, "0.159.2");
-        assert_eq!(ALIGNED_CODEX_VERSION, "0.162.1");
+        assert_eq!(ALIGNED_CODEX_VERSION, "0.163.0");
         for (version, accepted, status, note_direction) in [
             ("0.159.1", false, "below_minimum", None),
             ("0.159.2", true, "below_baseline_unverified", Some("older")),
             ("0.160.0", true, "below_baseline_unverified", Some("older")),
             (
-                "0.162.1-rc.1",
+                "0.163.0-rc.1",
                 true,
                 "below_baseline_unverified",
                 Some("older"),
             ),
-            ("0.162.1", true, "aligned", None),
-            ("0.162.1+build.7", true, "aligned", None),
+            ("0.163.0", true, "aligned", None),
+            ("0.163.0+build.7", true, "aligned", None),
             ("1.0.0", true, "above_baseline_unverified", Some("newer")),
         ] {
             let probe = Probe {
