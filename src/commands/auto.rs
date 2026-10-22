@@ -36,6 +36,14 @@ pub(crate) enum SwitchReason {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Waiting {
+    pub alias: String,
+    pub used_5h: Option<f64>,
+    pub used_7d: Option<f64>,
+    pub free_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Decision {
     /// Active account is under the threshold.
     Stay {
@@ -51,7 +59,10 @@ pub(crate) enum Decision {
         reason: SwitchReason,
     },
     /// Active account is over the threshold and no account is a viable target.
-    Blocked { pressure: f64 },
+    Blocked {
+        pressure: f64,
+        waiting: Vec<Waiting>,
+    },
 }
 
 /// The busier of the two quota windows, as a used percent. A window whose reset
@@ -108,6 +119,35 @@ pub(crate) fn decide(
         },
         None => Decision::Blocked {
             pressure: cur_pressure,
+            waiting: ranked
+                .iter()
+                .filter(|(c, _)| c.alias != current)
+                .map(|(c, _)| {
+                    let blocks = |used: f64| {
+                        used >= opts.threshold || used + opts.margin > cur_pressure
+                    };
+                    let used_5h = c.has_5h_data
+                        .then(|| c.effective_used_5h())
+                        .filter(|&u| blocks(u));
+                    let used_7d = c.has_7d_data
+                        .then(|| c.effective_used_7d())
+                        .filter(|&u| blocks(u));
+                    let free_at = match (used_5h, used_7d) {
+                        (Some(_), Some(_)) => c.resets_at_5h
+                            .zip(c.resets_at_7d)
+                            .map(|(a, b)| a.max(b)),
+                        (Some(_), None) => c.resets_at_5h,
+                        (None, Some(_)) => c.resets_at_7d,
+                        (None, None) => None,
+                    };
+                    Waiting {
+                        alias: c.alias.clone(),
+                        used_5h,
+                        used_7d,
+                        free_at,
+                    }
+                })
+                .collect(),
         },
     }
 }
@@ -175,6 +215,47 @@ pub(crate) fn decide_with_plans(
 
 pub(crate) fn stay_line(alias: &str, used_5h: f64, used_7d: f64) -> String {
     format!("auto: '{alias}' at 5h {used_5h:.0}%, 7d {used_7d:.0}%, staying")
+}
+
+pub(crate) fn blocked_wait(now: i64, waiting: &[Waiting], interval: Duration) -> Duration {
+    let maximum = interval.max(Duration::from_secs(600));
+    waiting
+        .iter()
+        .filter_map(|w| w.free_at)
+        .min()
+        .map_or(maximum, |free_at| {
+            Duration::from_secs(free_at.saturating_sub(now).max(0) as u64)
+                .saturating_add(Duration::from_secs(30))
+                .clamp(interval, maximum)
+        })
+}
+
+pub(crate) fn blocked_line(current: &str, pressure: f64, waiting: &[Waiting]) -> String {
+    let mut line = format!("auto: '{current}' at {pressure:.0}% and no account is a viable target");
+    for w in waiting {
+        line.push_str(&format!("; '{}'", w.alias));
+        let mut windows = Vec::new();
+        if let Some(used) = w.used_5h {
+            windows.push(format!("5h {used:.0}%"));
+        }
+        if let Some(used) = w.used_7d {
+            windows.push(format!("7d {used:.0}%"));
+        }
+        if windows.is_empty() {
+            line.push_str(" not eligible");
+            continue;
+        }
+        line.push_str(&format!(" {}", windows.join(", ")));
+        if let Some(free_at) = w.free_at {
+            line.push_str(&format!(
+                " free at {}",
+                crate::output::format_local_time(free_at)
+            ));
+        } else {
+            line.push_str(" no reset time");
+        }
+    }
+    line
 }
 
 /// Tell the person who minimized the window that something happened: the terminal
@@ -356,6 +437,7 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
             anyhow::bail!("no active profile; run `paper-codex-switch use <alias>` first");
         }
         let in_cooldown = last_switch.is_some_and(|t| t.elapsed() < opts.cooldown);
+        let mut blocked_delay = None;
 
         let code = match tick(&opts, &current, &current).await {
             Err(e) => {
@@ -385,22 +467,29 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
                 );
                 Some(EXIT_NOTHING_TO_DO)
             }
-            Ok(Decision::Blocked { pressure }) => {
+            Ok(Decision::Blocked { pressure, waiting }) => {
+                let wait = blocked_wait(auth::now_unix_secs(), &waiting, opts.interval);
+                blocked_delay = Some(wait);
                 if !last_blocked || opts.once {
+                    let waiting_json: Vec<_> = waiting
+                        .iter()
+                        .map(|w| serde_json::json!({
+                            "alias": w.alias, "used_5h": w.used_5h,
+                            "used_7d": w.used_7d, "free_at": w.free_at,
+                        }))
+                        .collect();
                     emit(
                         &opts,
                         "blocked",
-                        serde_json::json!({ "alias": current, "pressure": pressure }),
-                        color::warn(&format!(
-                            "auto: '{current}' at {pressure:.0}% and no account is a viable target"
-                        )),
+                        serde_json::json!({ "alias": current, "pressure": pressure, "waiting": waiting_json, "next_check_secs": wait.as_secs() }),
+                        color::warn(&blocked_line(&current, pressure, &waiting)),
                     );
                 }
                 if !last_blocked {
                     notify(
                         &opts,
                         "paper-codex-switch: no account left",
-                        &format!("'{current}' is at {pressure:.0}% and every other account is over the limit"),
+                        &blocked_line(&current, pressure, &waiting[..waiting.len().min(1)]),
                     );
                 }
                 last_blocked = true;
@@ -476,11 +565,7 @@ pub(crate) async fn auto_cmd(opts: AutoOptions) -> Result<()> {
         }
 
         // Exhausted pool: back off to a slower cadence instead of hammering the API.
-        let wait = if last_blocked {
-            opts.interval.max(Duration::from_secs(600))
-        } else {
-            opts.interval
-        };
+        let wait = blocked_delay.unwrap_or(opts.interval);
         tokio::select! {
             _ = tokio::time::sleep(wait) => {}
             _ = tokio::signal::ctrl_c() => return Ok(()),
