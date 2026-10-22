@@ -11,6 +11,18 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="auto-blocked-wait">
+<h2>auto: say why it is blocked, wake at the reset, release 1.0.22</h2>
+<small>Started 2026-10-22</small>
+<p>Owner saw auto "not switching". Logs and Codex session rate limits showed it was right: paperengineer07 hit 96% 7d while quehuongtran's 5h window stayed at 95% until 13:52, so auto was blocked, but it only said "no account is a viable target" and slept a fixed 10 minutes.</p>
+<ul>
+<li class="s done">Plan: Decision::Blocked carries the accounts in the way (blocking window, used %, free time); blocked_line prints them; blocked_wait sleeps until the earliest reset + 30 s, clamped to [interval, max(interval, 600 s)].</li>
+<li class="s done">T1 red (Codex): 6 locked tests in src/commands/auto_blocked_tests.rs; red = compile errors for the missing API only. Accepted e6f0f8d.</li>
+<li class="s done">T2 green (Codex): src/commands/auto.rs only; cargo test --lib commands::auto 32 passed, locked file unchanged, build clean. Live dry-run on a copied data folder (threshold 70): "'quehuongtran18111993' 7d 75% free at 10-28 11:00", JSON next_check_secs 600, exit 3. Accepted 1a2ceae.</li>
+<li class="s done">README EN/VI back-off line updated; version 1.0.22.</li>
+<li class="s run">Release v1.0.22: full unit suite, tag, GitHub release and npm.</li>
+</ul>
+</article>
 <article id="codex-01630-alignment">
 <h2>Codex 0.163.0 baseline, Dependabot updates, release 1.0.21</h2>
 <small>Started 2026-10-21</small>

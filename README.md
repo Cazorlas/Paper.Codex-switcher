@@ -153,7 +153,7 @@ How it decides:
 1. Every `--interval` it checks only the active account. Below the threshold: nothing else happens (no traffic for the other accounts), unless `--prefer-expiring` finds an earlier plan end in the local profile files.
 2. At or above the threshold it refreshes all accounts, ranks them with the same scoring as `use`, and picks the best eligible one that is under the threshold and `--margin` points lower.
 3. The switch is a compare-and-swap on the active marker, so it never overwrites a change made by another process. A running Codex app-server daemon is restarted afterwards, like after `use`.
-4. If every account is exhausted it backs off to a 10-minute cadence. Usage-check errors keep the current account and retry.
+4. If every account is exhausted it names the window in the way and when it frees up, and checks again right after that reset, never waiting more than 10 minutes between checks. Usage-check errors keep the current account and retry.
 5. On a switch, or when no account is left, it rings the terminal bell (which flashes a minimized window in the taskbar); add `--toast` for a Windows notification.
 
 `--once` exit codes: `0` switched, `1` error, `2` nothing to do, `3` blocked (no viable target). With `--json` each event is one JSON line.

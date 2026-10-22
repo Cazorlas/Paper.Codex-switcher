@@ -152,7 +152,7 @@ Cách nó quyết định:
 1. Mỗi `--interval` nó chỉ kiểm tra tài khoản đang dùng. Dưới ngưỡng thì không làm gì thêm (không gọi mạng cho các tài khoản khác), trừ khi `--prefer-expiring` tìm thấy gói hết hạn sớm hơn trong các tệp tài khoản cục bộ.
 2. Từ ngưỡng trở lên, nó làm mới tất cả tài khoản, xếp hạng bằng cùng thuật toán chấm điểm của `use`, và chọn tài khoản tốt nhất đủ điều kiện, dưới ngưỡng và thấp hơn `--margin` điểm.
 3. Việc đổi có kiểm tra tài khoản đang dùng chưa bị tiến trình khác đổi, nên không ghi đè thay đổi của nơi khác. Daemon app-server của Codex đang chạy sẽ được khởi động lại sau đó, giống sau `use`.
-4. Nếu mọi tài khoản đều cạn, nó giãn nhịp kiểm tra còn 10 phút một lần. Lỗi khi kiểm tra hạn mức thì giữ tài khoản hiện tại và thử lại.
+4. Nếu mọi tài khoản đều cạn, nó báo tài khoản nào đang vướng hạn mức nào và mấy giờ mở lại, rồi kiểm tra lại ngay sau giờ đó (không chờ quá 10 phút giữa hai lần kiểm tra). Lỗi khi kiểm tra hạn mức thì giữ tài khoản hiện tại và thử lại.
 5. Khi đổi hoặc khi hết tài khoản, nó phát chuông terminal (làm nhấp nháy cửa sổ đang thu nhỏ trên thanh tác vụ); thêm `--toast` để có thông báo Windows.
 
 Mã thoát của `--once`: `0` đã đổi, `1` lỗi, `2` không cần làm gì, `3` bị kẹt (không có tài khoản đích). Với `--json` mỗi sự kiện là một dòng JSON.
