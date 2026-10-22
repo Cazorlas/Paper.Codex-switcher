@@ -606,3 +606,6 @@ mod tests {
 #[cfg(test)]
 #[path = "auto_expiring_tests.rs"]
 mod expiring_tests;
+#[cfg(test)]
+#[path = "auto_blocked_tests.rs"]
+mod blocked_tests;
