@@ -20,7 +20,9 @@ code{font-size:13px;word-break:break-word}
 <li class="s done">T1 red (Codex): 6 locked tests in src/commands/auto_blocked_tests.rs; red = compile errors for the missing API only. Accepted e6f0f8d.</li>
 <li class="s done">T2 green (Codex): src/commands/auto.rs only; cargo test --lib commands::auto 32 passed, locked file unchanged, build clean. Live dry-run on a copied data folder (threshold 70): "'quehuongtran18111993' 7d 75% free at 10-28 11:00", JSON next_check_secs 600, exit 3. Accepted 1a2ceae.</li>
 <li class="s done">README EN/VI back-off line updated; version 1.0.22.</li>
-<li class="s run">Release v1.0.22: full unit suite, tag, GitHub release and npm.</li>
+<li class="s done">Release v1.0.22 at 0dfe21d: local cargo test --locked 795 unit + 45 CLI + 4 passed; test_launch_passthrough had timing flakes under load (different tests each run, each failing test passes alone). GitHub CI (main and tag) and release 39742350102 green: 4 assets, publish-npm printed + paper-codex-switch@1.0.22 (registry still showed 1.0.21 minutes later: propagation).</li>
+<li class="s done">Cleanup: collab session closed (report -Final), worktree and branch collab/main/auto-blocked-wait removed, two scratch copies of the data folder (they held tokens) deleted.</li>
+<li class="s todo">Not done: "until lapsed?" for quehuongtran comes from a stale id_token plan date; not investigated. Installed copy not updated (owner runs self-update).</li>
 </ul>
 </article>
 <article id="codex-01630-alignment">
