@@ -11,6 +11,16 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="deps-rustls-1023">
+<h2>Dependency sweep and rustls security fixes, release 1.0.23</h2>
+<small>Started 2026-11-02</small>
+<p>Dependabot auto-merge of #17 (tokio 1.54.1) failed with "Base branch was modified" because #16 and #18 merged at the same moment; merged by hand. A full cargo update (57 crates) closed 4 open rustls advisories (fixed in 0.23.46).</p>
+<ul>
+<li class="s done">#16 libc, #18 webbrowser auto-merged; #17 tokio merged by hand with an explanatory comment.</li>
+<li class="s done">#20 cargo update: local cargo test all suites green, CI green, merged. #19 rustls (Dependabot security) merged too. Open Dependabot alerts: 0.</li>
+<li class="s run">Release v1.0.23: tag, GitHub release and npm.</li>
+</ul>
+</article>
 <article id="auto-blocked-wait">
 <h2>auto: say why it is blocked, wake at the reset, release 1.0.22</h2>
 <small>Started 2026-10-22</small>
