@@ -483,6 +483,7 @@ mod tests {
             pool_size: 5,
             pool_exhausted: 0,
             team_priority: true,
+            limit_windows: None,
         }
     }
 
@@ -714,6 +715,7 @@ mod tests {
             pool_size: 1,
             pool_exhausted: 0,
             team_priority: true,
+            limit_windows: None,
         };
         // headroom=50 (no 5h data) + sustain=-50 (no 7d data) = 0
         assert_eq!(
@@ -756,6 +758,7 @@ mod tests {
             pool_size: 1,
             pool_exhausted: 1,
             team_priority: false,
+            limit_windows: None,
         };
         let s = score_unified(&c, 20.0);
         assert!(

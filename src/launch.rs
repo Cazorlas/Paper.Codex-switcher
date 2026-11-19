@@ -227,6 +227,9 @@ async fn launch_interactive(
     // this after both provider branches so provider keys remain independent.
     auth::ensure_file_credentials_store()?;
 
+    // The thread this child resumes by id, if its own argv names one; an
+    // auto-swap relaunch passes `resume <id>`, so a later swap reuses it.
+    let resumed_thread = crate::rollout_lookup::thread_from_args(&args);
     let forwarded = chatgpt_codex_argv(model, reasoning.clone(), args);
 
     let mut revival_hint = None;
@@ -337,6 +340,19 @@ async fn launch_interactive(
         user_println(&format!("Launching Codex with profile '{target_alias}'..."));
     }
 
+    // Rollouts before the child starts, so a swap can tell which thread it
+    // wrote to. Only an auto-swap TUI launch without a known id needs it.
+    // `spawn_codex` keeps the launcher's cwd, so it filters out rollouts of
+    // other Codex sessions sharing this codex home.
+    let codex_home = codex_auth.parent().map(std::path::Path::to_path_buf);
+    let child_cwd = std::env::current_dir().ok();
+    let rollouts_before = match (&codex_home, &resumed_thread) {
+        (Some(home), None) if auto_swap.is_some() && !json => {
+            Some(crate::rollout_lookup::snapshot_rollouts(home))
+        }
+        _ => None,
+    };
+
     let child_result = spawn_codex(&codex_command, &forwarded, None, json, None);
 
     let mut child = match child_result {
@@ -419,12 +435,33 @@ async fn launch_interactive(
         }
         SessionEnd::Swap(next) => {
             terminate_child(&mut child, pipes);
-            user_println(&format!(
-                "auto-swap: '{target_alias}' is near its usage limit; resuming the session on '{next}'..."
-            ));
+            let thread = resumed_thread.or_else(|| {
+                let home = codex_home.as_deref()?;
+                crate::rollout_lookup::find_thread_since(
+                    home,
+                    rollouts_before.as_ref()?,
+                    child_cwd.as_deref(),
+                )
+            });
+            match &thread {
+                Some(id) => {
+                    let short: String = id.chars().take(8).collect();
+                    user_println(&format!(
+                        "auto-swap: '{target_alias}' is near its usage limit; resuming the session {short} on '{next}'..."
+                    ));
+                }
+                None => {
+                    tracing::warn!(
+                        "auto-swap: could not identify the running Codex thread; falling back to `resume --last`"
+                    );
+                    user_println(&format!(
+                        "auto-swap: '{target_alias}' is near its usage limit; resuming the session on '{next}'..."
+                    ));
+                }
+            }
             return Box::pin(launch_interactive(
                 Some(&next),
-                vec!["resume".into(), "--last".into()],
+                swap_resume_args(thread.as_deref()),
                 json,
                 false,
                 model,
@@ -463,6 +500,16 @@ async fn launch_interactive(
     }
 
     Ok(TuiLaunchOutcome::Exited(exit_code))
+}
+
+/// Passthrough argv for the auto-swap relaunch: `resume <id>` when the thread
+/// is known (Codex >= 0.168 scopes `--last` to the signed-in account), else
+/// `resume --last`.
+fn swap_resume_args(thread: Option<&str>) -> Vec<String> {
+    match thread {
+        Some(id) => vec!["resume".into(), id.into()],
+        None => vec!["resume".into(), "--last".into()],
+    }
 }
 
 /// Codex argv for a ChatGPT `launch`: optional `--model` and one-shot
@@ -602,7 +649,7 @@ fn codex_syntax_indices(args: &[String]) -> Vec<usize> {
     indices
 }
 
-fn codex_subcommand_index(args: &[String]) -> Option<usize> {
+pub(crate) fn codex_subcommand_index(args: &[String]) -> Option<usize> {
     let index = codex_syntax_indices(args)
         .into_iter()
         .find(|&index| !args[index].starts_with('-'))?;
@@ -1325,7 +1372,7 @@ fn resume_option_takes_value(arg: &str) -> bool {
     .any(|option| arg == *option || arg.starts_with(&format!("{option}=")))
 }
 
-fn resume_positional_indices(args: &[String], resume_at: usize) -> Vec<usize> {
+pub(crate) fn resume_positional_indices(args: &[String], resume_at: usize) -> Vec<usize> {
     let mut positional = Vec::new();
     let mut after_separator = false;
     let mut skip_next = false;
@@ -1359,7 +1406,7 @@ fn resume_positional_indices(args: &[String], resume_at: usize) -> Vec<usize> {
     positional
 }
 
-fn resume_flag_before_separator(args: &[String], resume_at: usize, flag: &str) -> bool {
+pub(crate) fn resume_flag_before_separator(args: &[String], resume_at: usize, flag: &str) -> bool {
     args[resume_at + 1..]
         .iter()
         .take_while(|arg| arg.as_str() != "--")
@@ -2069,6 +2116,15 @@ mod tests {
         let mut child = spawn_codex(&command, &[], None, true, None)
             .expect("the command accepted by preflight must also be spawnable");
         assert!(child.wait().unwrap().success());
+    }
+
+    #[test]
+    fn swap_relaunch_resumes_the_known_thread_by_id() {
+        assert_eq!(
+            super::swap_resume_args(Some("01a1f460-bb66-7d01-a63b-7abeeec3459e")),
+            ["resume", "01a1f460-bb66-7d01-a63b-7abeeec3459e"]
+        );
+        assert_eq!(super::swap_resume_args(None), ["resume", "--last"]);
     }
 
     #[test]

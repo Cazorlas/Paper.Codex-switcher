@@ -126,18 +126,31 @@ pub(crate) fn decide(
                     let blocks = |used: f64| {
                         used >= opts.threshold || used + opts.margin > cur_pressure
                     };
-                    let used_5h = c.has_5h_data
-                        .then(|| c.effective_used_5h())
-                        .filter(|&u| blocks(u));
-                    let used_7d = c.has_7d_data
-                        .then(|| c.effective_used_7d())
-                        .filter(|&u| blocks(u));
+                    // A limited account is scored at a forced 100% with no reset;
+                    // report its real full windows instead, so the wait can end
+                    // when they reset.
+                    let (used_5h, resets_5h, used_7d, resets_7d) = match &c.limit_windows {
+                        Some(lw) => (
+                            lw.five_hour.map(|w| w.used),
+                            lw.five_hour.and_then(|w| w.resets_at),
+                            lw.seven_day.map(|w| w.used),
+                            lw.seven_day.and_then(|w| w.resets_at),
+                        ),
+                        None => (
+                            c.has_5h_data
+                                .then(|| c.effective_used_5h())
+                                .filter(|&u| blocks(u)),
+                            c.resets_at_5h,
+                            c.has_7d_data
+                                .then(|| c.effective_used_7d())
+                                .filter(|&u| blocks(u)),
+                            c.resets_at_7d,
+                        ),
+                    };
                     let free_at = match (used_5h, used_7d) {
-                        (Some(_), Some(_)) => c.resets_at_5h
-                            .zip(c.resets_at_7d)
-                            .map(|(a, b)| a.max(b)),
-                        (Some(_), None) => c.resets_at_5h,
-                        (None, Some(_)) => c.resets_at_7d,
+                        (Some(_), Some(_)) => resets_5h.zip(resets_7d).map(|(a, b)| a.max(b)),
+                        (Some(_), None) => resets_5h,
+                        (None, Some(_)) => resets_7d,
                         (None, None) => None,
                     };
                     Waiting {
@@ -607,6 +620,7 @@ mod tests {
             pool_size: 2,
             pool_exhausted: 0,
             team_priority: false,
+            limit_windows: None,
         }
     }
 

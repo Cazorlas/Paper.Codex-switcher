@@ -11,6 +11,17 @@ h1{font-size:20px}article{border:1px solid var(--line);border-radius:8px;padding
 code{font-size:13px;word-break:break-word}
 </style></head><body>
 <h1>Paper.Codex-switcher - progress</h1>
+<article id="codex-170-1024">
+<h2>Codex 0.170.0 baseline, auto-swap resume by id, limited-account wait, release 1.0.24</h2>
+<small>Started 2026-11-19</small>
+<p>Health issue #15 reported Codex 0.166-0.169 above the verified 0.163. Upstream rust-v0.163.0..rust-v0.170.0 reviewed from source: prompt.md unchanged, auth.json gains optional oauth_provenance/login_owner_id (kept, we write JSON values), atomic auth.json replace + auth.lock + compare_and_save in Codex, OAuth client/issuer and /wham/usage unchanged, catalog adds only optional fields. Codex 0.168.0 (#58918) scopes <code>resume --last</code> to the signed-in account.</p>
+<ul>
+<li class="s done">T1 (Claude worker): <code>auto</code> blocked report used forced 100%/no reset for a rate-limited account; now reports its real full window and reset. Live: "'quehuongtran18111993' 7d 100% free at 11-20 10:48" (was "5h 100%, 7d 100% no reset time").</li>
+<li class="s done">T2 (Claude worker): <code>launch --auto-swap</code> relaunches with <code>resume &lt;thread-id&gt;</code> found from the args or the rollout the child wrote (same cwd), else falls back to <code>resume --last</code>. Unit-tested; not yet seen by a human in a real TTY swap.</li>
+<li class="s done">T3 (A): ALIGNED_CODEX_VERSION and VERIFIED_CODEX_MINOR raised to 0.170.0 / 170; doctor with npm codex 0.170.0 reports aligned; <code>--no-daemon</code>, <code>resume --last</code>, <code>app-server daemon restart</code> present in 0.170.0 --help.</li>
+<li class="s done">Full suite on the session branch: 970 tests green (-j 2; the machine ran out of paging file at default parallelism). Live <code>launch ... exec</code> not run: both accounts were at 100% 5h or 7d.</li>
+</ul>
+</article>
 <article id="deps-rustls-1023">
 <h2>Dependency sweep and rustls security fixes, release 1.0.23</h2>
 <small>Started 2026-11-02</small>

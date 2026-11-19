@@ -20,6 +20,7 @@ fn cand(alias: &str, used_5h: f64, used_7d: f64) -> usage::Candidate {
         pool_size: 2,
         pool_exhausted: 0,
         team_priority: false,
+        limit_windows: None,
     }
 }
 

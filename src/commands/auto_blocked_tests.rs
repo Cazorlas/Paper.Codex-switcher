@@ -25,7 +25,117 @@ fn cand(
         pool_size: 2,
         pool_exhausted: 0,
         team_priority: false,
+        limit_windows: None,
     }
+}
+
+/// A candidate the backend marked as limited, built the way `auto` builds it.
+fn limited(alias: &str, w5h: (f64, Option<i64>), w7d: (f64, Option<i64>)) -> usage::Candidate {
+    let window = |(used, resets_at): (f64, Option<i64>)| {
+        Some(usage::WindowUsage {
+            used_percent: Some(used),
+            resets_at,
+            window_minutes: None,
+        })
+    };
+    let u = usage::UsageInfo {
+        primary: window(w5h),
+        secondary: window(w7d),
+        account_limited: true,
+        ..Default::default()
+    };
+    let mut c = usage::Candidate::from_usage(alias.into(), &u, false, false, 0, N);
+    c.pool_size = 2;
+    c
+}
+
+const R7: i64 = N + 45_660;
+
+fn blocked_by(other: usage::Candidate) -> Decision {
+    let ranked = vec![(cand("p07", 93.0, None, 96.0, None), 1.0), (other, 2.0)];
+    decide("p07", &ranked, false, &opts(), 20.0)
+}
+
+#[test]
+fn limited_account_with_full_weekly_window_waits_for_its_real_reset() {
+    let queh = limited("queh", (0.0, Some(N + 18_000)), (100.0, Some(R7)));
+    // Scoring still sees the forced exhaustion.
+    assert_eq!((queh.used_5h, queh.used_7d), (100.0, 100.0));
+    assert_eq!((queh.resets_at_5h, queh.resets_at_7d), (None, None));
+    assert_eq!(pressure(&queh), 100.0);
+    assert_eq!(
+        blocked_by(queh),
+        Decision::Blocked {
+            pressure: 96.0,
+            waiting: vec![Waiting {
+                alias: "queh".into(),
+                used_5h: None,
+                used_7d: Some(100.0),
+                free_at: Some(R7),
+            }],
+        }
+    );
+}
+
+#[test]
+fn limited_account_blocked_line_names_the_weekly_reset() {
+    let Decision::Blocked { pressure, waiting } =
+        blocked_by(limited("queh", (0.0, Some(N + 18_000)), (100.0, Some(R7))))
+    else {
+        panic!("expected Blocked");
+    };
+    assert_eq!(
+        blocked_line("p07", pressure, &waiting),
+        format!(
+            "auto: 'p07' at 96% and no account is a viable target; 'queh' 7d 100% free at {}",
+            crate::output::format_local_time(R7)
+        )
+    );
+}
+
+#[test]
+fn limited_account_with_both_windows_full_waits_for_the_later_reset() {
+    assert_eq!(
+        blocked_by(limited("queh", (100.0, Some(N + 600)), (100.0, Some(R7)))),
+        Decision::Blocked {
+            pressure: 96.0,
+            waiting: vec![Waiting {
+                alias: "queh".into(),
+                used_5h: Some(100.0),
+                used_7d: Some(100.0),
+                free_at: Some(R7),
+            }],
+        }
+    );
+    // One of the two resets unknown: no free time.
+    assert_eq!(
+        blocked_by(limited("queh", (100.0, None), (100.0, Some(R7)))),
+        Decision::Blocked {
+            pressure: 96.0,
+            waiting: vec![Waiting {
+                alias: "queh".into(),
+                used_5h: Some(100.0),
+                used_7d: Some(100.0),
+                free_at: None,
+            }],
+        }
+    );
+}
+
+#[test]
+fn limited_account_without_a_full_window_keeps_the_forced_report() {
+    assert_eq!(
+        blocked_by(limited("queh", (10.0, Some(N + 600)), (40.0, Some(R7)))),
+        Decision::Blocked {
+            pressure: 96.0,
+            waiting: vec![Waiting {
+                alias: "queh".into(),
+                used_5h: Some(100.0),
+                used_7d: Some(100.0),
+                free_at: None,
+            }],
+        }
+    );
 }
 
 fn opts() -> AutoOptions {

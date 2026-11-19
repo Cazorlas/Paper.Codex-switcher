@@ -38,6 +38,7 @@ mod output;
 pub mod profile;
 #[allow(dead_code)]
 mod provider;
+mod rollout_lookup;
 #[allow(dead_code)]
 mod signals;
 #[allow(dead_code)]

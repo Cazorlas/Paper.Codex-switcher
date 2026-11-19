@@ -129,6 +129,50 @@ pub fn additional_pool_rows(limits: &[AdditionalRateLimit]) -> Vec<PoolRow> {
         .collect()
 }
 
+/// One real quota window of a limited account that is at or over 100%.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LimitWindow {
+    pub used: f64,
+    pub resets_at: Option<i64>,
+}
+
+/// The real full windows of an account the backend marked as limited.
+///
+/// `Candidate::from_usage` forces a limited account to 100% with no reset so it
+/// scores as exhausted; this keeps what the API actually reported for the
+/// windows that are full, so a "blocked" report can say when the account comes
+/// back. Not used by scoring.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct LimitWindows {
+    pub five_hour: Option<LimitWindow>,
+    pub seven_day: Option<LimitWindow>,
+}
+
+impl LimitWindows {
+    /// The full real windows of a limited account, or `None` when the account is
+    /// not limited or no real window is at 100% (credits depleted, spend control).
+    fn from_usage(u: &UsageInfo) -> Option<Self> {
+        if !u.account_limited {
+            return None;
+        }
+        let full = |w: &Option<WindowUsage>| {
+            w.as_ref().and_then(|w| {
+                w.used_percent
+                    .filter(|&used| used >= 100.0)
+                    .map(|used| LimitWindow {
+                        used,
+                        resets_at: w.resets_at,
+                    })
+            })
+        };
+        let windows = Self {
+            five_hour: full(&u.primary),
+            seven_day: full(&u.secondary),
+        };
+        (windows.five_hour.is_some() || windows.seven_day.is_some()).then_some(windows)
+    }
+}
+
 /// All data needed to score an account. Pure data, no I/O.
 #[derive(Debug, Clone)]
 pub struct Candidate {
@@ -147,6 +191,9 @@ pub struct Candidate {
     pub pool_size: usize,
     pub pool_exhausted: usize,
     pub team_priority: bool,
+    /// For a limited account: the real full windows behind the forced 100%.
+    /// Reporting only; scoring reads the forced fields above.
+    pub limit_windows: Option<LimitWindows>,
 }
 
 impl Candidate {
@@ -193,6 +240,7 @@ impl Candidate {
             pool_size: 1,
             pool_exhausted: 0,
             team_priority: false,
+            limit_windows: LimitWindows::from_usage(u),
         }
     }
 
@@ -477,5 +525,68 @@ mod pool_row_tests {
 
         let rows = additional_pool_rows(&limits);
         assert!(rows[0].unavailable);
+    }
+}
+
+#[cfg(test)]
+mod limited_candidate_tests {
+    use super::*;
+
+    fn window(used: f64, resets_at: i64) -> Option<WindowUsage> {
+        Some(WindowUsage {
+            used_percent: Some(used),
+            resets_at: Some(resets_at),
+            window_minutes: None,
+        })
+    }
+
+    #[test]
+    fn limited_account_still_scores_as_exhausted_but_keeps_its_real_full_window() {
+        let u = UsageInfo {
+            primary: window(0.0, 18_000),
+            secondary: window(100.0, 45_660),
+            account_limited: true,
+            ..Default::default()
+        };
+        let c = Candidate::from_usage("queh".into(), &u, false, false, 0, 0);
+        assert_eq!(c.used_5h, 100.0);
+        assert_eq!(c.used_7d, 100.0);
+        assert_eq!(c.resets_at_5h, None);
+        assert_eq!(c.resets_at_7d, None);
+        assert_eq!(
+            c.limit_windows,
+            Some(LimitWindows {
+                five_hour: None,
+                seven_day: Some(LimitWindow {
+                    used: 100.0,
+                    resets_at: Some(45_660),
+                }),
+            })
+        );
+    }
+
+    #[test]
+    fn limited_account_without_a_full_window_has_no_limit_windows() {
+        let u = UsageInfo {
+            primary: window(10.0, 18_000),
+            secondary: window(40.0, 45_660),
+            account_limited: true,
+            ..Default::default()
+        };
+        let c = Candidate::from_usage("queh".into(), &u, false, false, 0, 0);
+        assert_eq!((c.used_5h, c.used_7d), (100.0, 100.0));
+        assert_eq!(c.limit_windows, None);
+    }
+
+    #[test]
+    fn unlimited_account_has_no_limit_windows() {
+        let u = UsageInfo {
+            primary: window(100.0, 18_000),
+            secondary: window(100.0, 45_660),
+            ..Default::default()
+        };
+        let c = Candidate::from_usage("queh".into(), &u, false, false, 0, 0);
+        assert_eq!(c.resets_at_5h, Some(18_000));
+        assert_eq!(c.limit_windows, None);
     }
 }
